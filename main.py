@@ -1,35 +1,35 @@
-importar discórdia
-de discórdia.extensão importar comandos
+importar discordia
+de discordia.extensao importar comandos
 importar os
 importar threading
 de flask importar Flask
 
-app = Flask('')
+aplicativo = Flask('')
 
-@app.rota('/')
-def home():
-    devolver "Bot PARADOX-RP tá online"
+@aplicativo.rota('/')
+def lar():
+    devolver "Bot PARADOX-RP está online"
 
-def run():
-    app.correr(host='0.0.0.0', porta=10000)
+def correr():
+    aplicativo.correr(hospedar="0.0.0.0", porta=10000)
 
-def keep_alive():
-    t = threading.Thread(alvo=run)
+def manter_vivo():
+    t = threading.Fio(alvo=correr)
     t.iniciar()
 
-keep_alive()
+manter_vivo()
 
 
-intenções = discórdia.intenções.todos()
+quero = discordia.quero.todos()
 robô = comandos.Robô(prefixo_de_comando="!")
 
 @robô.evento
-assíncrono definição pronto():
-    imprimir(f'PARADOX RP ONLINE:{robô.usuário}')
+assincrono definicao pronto():
+    imprimir(f'PARADOX RP ONLINE:{robô.usuario}')
 
 @robô.comando()
-assíncrono definição ping(ctx):
+assincrono definicao ping(ctx):
     aguardar ctx.enviar('Pong! Bot online')
 
-TOKEN = os.pegar_var_ambiente('TOKEN')
-robô.correr(TOKEN)
+FICHA = os.pegar_var_ambiente('TOKEN')
+robô.correr(FICHA)
