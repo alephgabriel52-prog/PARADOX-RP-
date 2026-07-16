@@ -1,17 +1,35 @@
-import discord
-from discord.ext import commands
-import os
+importar discórdia
+de discórdia.extensão importar comandos
+importar os
+importar threading
+de flask importar Flask
 
-intents = discord.Intents.all()
-bot = commands.Bot(command_prefix="!", intents=intents)
+app = Flask('')
 
-@bot.event
-async def on_ready():
-    print(f'PARADOX RP ONLINE: {bot.user}')
+@app.rota('/')
+def home():
+    devolver "Bot PARADOX-RP tá online"
 
-@bot.command()
-async def ping(ctx):
-    await ctx.send('Pong! Bot 24/7 online ✅')
+def run():
+    app.correr(host='0.0.0.0', porta=10000)
 
-bot.run(os.getenv('TOKEN'))
+def keep_alive():
+    t = threading.Thread(alvo=run)
+    t.iniciar()
 
+keep_alive()
+
+
+intenções = discórdia.intenções.todos()
+robô = comandos.Robô(prefixo_de_comando="!")
+
+@robô.evento
+assíncrono definição pronto():
+    imprimir(f'PARADOX RP ONLINE:{robô.usuário}')
+
+@robô.comando()
+assíncrono definição ping(ctx):
+    aguardar ctx.enviar('Pong! Bot online')
+
+TOKEN = os.pegar_var_ambiente('TOKEN')
+robô.correr(TOKEN)
