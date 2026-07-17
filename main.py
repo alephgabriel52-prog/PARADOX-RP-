@@ -15,12 +15,11 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 intents.guilds = True
-intents.message_history = True
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
 WEBHOOK_URL = ""
 tickets_abertos = {}
-respostas_ticket = {} # guarda as respostas
+respostas_ticket = {}
 
 async def enviar_log(tipo, user, staff, motivo, canal="logs-rp"):
     canal_logs = discord.utils.get(bot.get_all_channels(), name=canal)
@@ -46,7 +45,7 @@ PERGUNTAS = [
     "12. Você tem microfone e sabe falar no RP?",
     "13. Quantas horas por dia você pode jogar?",
     "14. Você promete não usar cheats/mods?",
-    "15. Qual será seu Nick no Discord? Ex: João Silva", # ESSA AQUI VAI VIRAR O NICK
+    "15. Qual será seu Nick no Discord? Ex: João Silva",
     "16. Por que devemos te aceitar no servidor?"
 ]
 
@@ -64,12 +63,9 @@ class WhitelistButton(discord.ui.View):
         if not category: category = await guild.create_category("WHITELIST")
         channel = await guild.create_text_channel(f"ticket-{interaction.user.name}", overwrites=overwrites, category=category)
         tickets_abertos[str(interaction.user.id)] = channel.id
-        respostas_ticket[str(interaction.user.id)] = [] # cria lista pra guardar respostas
-
+        respostas_ticket[str(interaction.user.id)] = []
         embed = discord.Embed(title="📋 FORMULÁRIO DE WHITELIST", description="Responda as 16 perguntas abaixo. 1 por mensagem", color=0x2b2d31)
-        for p in PERGUNTAS: embed.add_field(name=p, value="Aguarde a próxima pergunta", inline=False)
-        view = TicketCloseView()
-        await channel.send(f"{interaction.user.mention} Bem vindo! Responda a pergunta 1:", embed=embed, view=view)
+        await channel.send(f"{interaction.user.mention} Bem vindo! Responda a pergunta 1: **{PERGUNTAS[0]}**", view=TicketCloseView())
         await interaction.response.send_message(f"✅ Ticket criado: {channel.mention}", ephemeral=True)
 
 class TicketCloseView(discord.ui.View):
@@ -84,25 +80,20 @@ class TicketCloseView(discord.ui.View):
         user_id = str(member.id)
         role = discord.utils.get(interaction.guild.roles, name="Membro")
         if role: await member.add_roles(role)
-
-        # MUDA O NICK AUTOMÁTICO - PEGA RESPOSTA 15
         if user_id in respostas_ticket and len(respostas_ticket[user_id]) >= 15:
-            nick = respostas_ticket[user_id][14] # posição 14 = pergunta 15
+            nick = respostas_ticket[user_id][14]
             try:
-                await member.edit(nick=nick[:32]) # limite do discord é 32
+                await member.edit(nick=nick[:32])
                 nick_msg = f"Nick alterado para: **{nick}**"
             except:
-                nick_msg = "❌ Não consegui mudar o nick. Verifique as permissões do bot."
+                nick_msg = "❌ Não consegui mudar o nick. Dê 'Gerenciar Apelidos' pro bot e coloque ele no topo."
         else:
             nick_msg = "⚠️ Nick não encontrado nas respostas"
-
         await enviar_log("WHITELIST", member, interaction.user, f"Aprovado. {nick_msg}", "logs-rp")
         await interaction.response.send_message(f"✅ {member.mention} foi aprovado!\n{nick_msg}")
-
         if user_id in tickets_abertos: del tickets_abertos[user_id]
         if user_id in respostas_ticket: del respostas_ticket[user_id]
         await interaction.channel.delete()
-
     @discord.ui.button(label="Reprovar", style=discord.ButtonStyle.red, emoji="❌")
     async def reprovar(self, interaction: discord.Interaction, button: discord.ui.Button):
         member = interaction.channel.members[1]
@@ -140,7 +131,7 @@ async def on_message_delete(message):
     await enviar_log("MENSAGEM APAGADA", message.author, None, f'Canal: #{message.channel.name}', "logs")
 
 @bot.event
-async def on_member_update(before, after):
+async def on_member_update(before, after): # CORRIGIDO
     if before.roles!= after.roles:
         await enviar_log("CARGO ALTERADO", after, None, "Cargos modificados", "logs")
         try:
