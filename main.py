@@ -18,18 +18,10 @@ intents.members = True
 intents.guilds = True
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
-ARQUIVO_DINHEIRO = 'economia.json'
 ARQUIVO_WARNS = 'warns.json'
-ARQUIVO_FICHA = 'ficha.json'
-ARQUIVO_ITENS = 'itens.json'
-for arquivo, var in [(ARQUIVO_WARNS, 'warns'), (ARQUIVO_DINHEIRO, 'economia'), (ARQUIVO_FICHA, 'ficha'), (ARQUIVO_ITENS, 'itens')]:
-    try: globals()[var] = json.load(open(arquivo, 'r'))
-    except: globals()[var] = {}
-def salvar_tudo():
-    json.dump(warns, open(ARQUIVO_WARNS, 'w'))
-    json.dump(economia, open(ARQUIVO_DINHEIRO, 'w'))
-    json.dump(ficha, open(ARQUIVO_FICHA, 'w'))
-    json.dump(itens, open(ARQUIVO_ITENS, 'w'))
+try: warns = json.load(open(ARQUIVO_WARNS, 'r'))
+except: warns = {}
+def salvar_warns(): json.dump(warns, open(ARQUIVO_WARNS, 'w'))
 
 async def get_canal_punicao(guild, tipo):
     category = discord.utils.get(guild.categories, name="PUNIÇÕES")
@@ -87,15 +79,18 @@ class MotivoModal(discord.ui.Modal):
     async def on_submit(self, interaction: discord.Interaction):
         user_id = str(self.member.id)
         if self.tipo == "aprovado":
-            await self.member.add_roles(discord.utils.get(interaction.guild.roles, name="Membro"))
-            if user_id not in economia: economia[user_id] = {"carteira": 1000, "banco": 0}
-            salvar_tudo()
-            try: await self.member.send(f"✅ APROVADO! Motivo: {self.motivo.value}")
+            role = discord.utils.get(interaction.guild.roles, name="Membro")
+            if role: await self.member.add_roles(role)
+            if user_id in respostas_ticket and len(respostas_ticket[user_id]) >= 15:
+                nick = respostas_ticket[user_id][14]
+                try: await self.member.edit(nick=nick[:32])
+                except: pass
+            try: await self.member.send(embed=discord.Embed(title="✅ APROVADO", description=f"Motivo: {self.motivo.value}", color=0x00ff00))
             except: pass
             await enviar_log("WHITELIST APROVADA", self.member, interaction.user, self.motivo.value)
             await interaction.response.send_message(f"✅ {self.member.mention} aprovado!", ephemeral=True)
         else:
-            try: await self.member.send(f"❌ REPROVADO! Motivo: {self.motivo.value}")
+            try: await self.member.send(embed=discord.Embed(title="❌ REPROVADO", description=f"Motivo: {self.motivo.value}", color=0xff0000))
             except: pass
             await enviar_log("WHITELIST REPROVADA", self.member, interaction.user, self.motivo.value)
             await interaction.response.send_message(f"❌ {self.member.mention} reprovado!", ephemeral=True)
@@ -120,11 +115,54 @@ async def on_message(message):
                 num = len(respostas_ticket[user_id])
                 if num < len(PERGUNTAS):
                     await message.channel.send(f"✅ Anotado! Pergunta {num + 1}: **{PERGUNTAS[num]}**")
+                else:
+                    await message.channel.send("✅ Todas respondidas! Clique em Aprovar/Reprovar e escreva o motivo.")
     await bot.process_commands(message)
+
+# ===== COMANDOS FINAIS =====
+
+@bot.command()
+@commands.has_permissions(manage_roles=True)
+async def algemar(ctx, member: discord.Member):
+    role_algema = discord.utils.get(ctx.guild.roles, name="Algemado")
+    if not role_algema: role_algema = await ctx.guild.create_role(name="Algemado", color=0x808080)
+    if role_algema in member.roles:
+        await member.remove_roles(role_algema)
+        await ctx.send(f"🔓 {member.mention} foi **desalgemado**")
+        await enviar_log("DESALGEMAR", member, ctx.author, "Liberado", "rp")
+    else:
+        await member.add_roles(role_algema)
+        await ctx.send(f"⛓️ {member.mention} foi **algemado**")
+        await enviar_log("ALGEMAR", member, ctx.author, "Algemado para abordagem RP", "rp")
+
+@bot.command()
+@commands.has_permissions(ban_members=True)
+async def ban(ctx, member: discord.Member, *, reason="Sem motivo"):
+    await member.ban(reason=reason)
+    await enviar_log("BAN", member, ctx.author, reason, "ban")
+    await ctx.send(f"🔨 {member.mention} foi banido.\nMotivo: {reason}")
+
+@bot.command()
+@commands.has_permissions(kick_members=True)
+async def kick(ctx, member: discord.Member, *, reason="Sem motivo"):
+    await member.kick(reason=reason)
+    await enviar_log("KICK", member, ctx.author, reason, "kick")
+    await ctx.send(f"👢 {member.mention} foi expulso.\nMotivo: {reason}")
+
+@bot.command()
+@commands.has_permissions(manage_roles=True)
+async def warn(ctx, member: discord.Member, *, motivo):
+    user_id = str(member.id)
+    if user_id not in warns: warns[user_id] = []
+    warns[user_id].append(motivo)
+    salvar_warns()
+    total = len(warns[user_id])
+    await enviar_log("WARN", member, ctx.author, f"{motivo} | Total: {total}/3", "warn")
+    await ctx.send(f"⚠️ {member.mention} recebeu warn. Total: **{total}/3**")
 
 @bot.command()
 @commands.has_permissions(administrator=True)
-async def painelwhitelist(ctx): # <-- COMANDO CORRETO
+async def painelwhitelist(ctx):
     canal = discord.utils.get(ctx.guild.channels, name="whitelist") or await ctx.guild.create_text_channel("whitelist")
     await canal.send(embed=discord.Embed(title="🎫 SISTEMA DE WHITELIST", description="Clique no botão abaixo", color=0x00ff00), view=WhitelistButton())
     await ctx.send(f"✅ Painel criado em {canal.mention}")
