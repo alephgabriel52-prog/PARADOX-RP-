@@ -20,7 +20,7 @@ intents.guilds = True
 intents.presences = True
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
-STAFF_ROLE_ID = 1527693962553331772
+STAFF_ROLE_ID = 1526291626027384904 # CARGO STAFF
 STAFF_MENTION = f"<@&{STAFF_ROLE_ID}>"
 
 ARQUIVO_WARNS = 'warns.json'
@@ -39,7 +39,7 @@ async def criar_categoria_punicoes(guild):
     category = discord.utils.get(guild.categories, name="PUNIÇÕES")
     if not category:
         category = await guild.create_category("PUNIÇÕES")
-    canais = ["logs-ban", "logs-kick", "logs-warn", "logs-rp", "logs-antisabotagem"]
+    canais = ["logs", "logs-rp", "logs-ban", "logs-kick", "logs-warn", "logs-antisabotagem"]
     for nome in canais:
         if not discord.utils.get(guild.channels, name=nome):
             overwrites = {guild.default_role: discord.PermissionOverwrite(view_channel=False), guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True)}
@@ -56,7 +56,7 @@ async def enviar_log(tipo, user, staff, motivo, canal_nome):
         embed.add_field(name="Motivo", value=motivo, inline=False)
         await canal.send(embed=embed)
 
-tickets_abertos = {} # key = user_id, value = channel_id
+tickets_abertos = {}
 respostas_ticket = {}
 PERGUNTAS = ["1. Nome RP?", "2. Idade?", "3. Leu as regras?", "4. O que é RP?", "5. FailRP?", "6. MetaGaming?", "7. PowerGaming?", "8. Jogou em outro servidor?", "9. Personagem?", "10. Abordado pela PM?", "11. Assaltado?", "12. Tem mic?", "13. Horas por dia?", "14. Promete não usar cheat?", "15. Nick Discord?", "16. Porque aceitar?"]
 
@@ -65,14 +65,12 @@ class WhitelistButton(discord.ui.View):
     @discord.ui.button(label="Fazer Whitelist", style=discord.ButtonStyle.green, emoji="✅", custom_id="btn_whitelist_001")
     async def whitelist(self, interaction: discord.Interaction, button: discord.ui.Button):
         user_id = str(interaction.user.id)
-
         if user_id in tickets_abertos:
             canal_ticket = interaction.guild.get_channel(tickets_abertos[user_id])
             if canal_ticket:
                 return await interaction.response.send_message(f"❌ Você já tem um ticket aberto: {canal_ticket.mention}", ephemeral=True)
             else:
                 del tickets_abertos[user_id]
-
         category = discord.utils.get(interaction.guild.categories, name="WHITELIST") or await interaction.guild.create_category("WHITELIST")
         overwrites = {
             interaction.guild.default_role: discord.PermissionOverwrite(view_channel=False),
@@ -80,7 +78,6 @@ class WhitelistButton(discord.ui.View):
             interaction.guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True)
         }
         channel = await interaction.guild.create_text_channel(f"whitelist-{interaction.user.name}", category=category, overwrites=overwrites)
-
         tickets_abertos[user_id] = channel.id
         respostas_ticket[user_id] = []
         await channel.send(f"{interaction.user.mention} Bem-vindo a whitelist! Responda a pergunta 1:\n\n**{PERGUNTAS[0]}**", view=TicketCloseView())
@@ -105,13 +102,11 @@ class StaffButton(discord.ui.View):
 
 class TicketCloseView(discord.ui.View):
     def __init__(self): super().__init__(timeout=None)
-
     async def get_ticket_owner(self, interaction):
         for uid, cid in tickets_abertos.items():
             if cid == interaction.channel.id:
                 return interaction.guild.get_member(int(uid))
         return None
-
     @discord.ui.button(label="Aprovar", style=discord.ButtonStyle.green, emoji="✅", custom_id="btn_aprovar_001")
     async def aprovar(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not any(role.id == STAFF_ROLE_ID for role in interaction.user.roles):
@@ -119,7 +114,6 @@ class TicketCloseView(discord.ui.View):
         member = await self.get_ticket_owner(interaction)
         if not member: return await interaction.response.send_message("❌ Não achei o dono do ticket", ephemeral=True)
         await interaction.response.send_modal(MotivoModal(member, "aprovado"))
-
     @discord.ui.button(label="Reprovar", style=discord.ButtonStyle.red, emoji="❌", custom_id="btn_reprovar_001")
     async def reprovar(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not any(role.id == STAFF_ROLE_ID for role in interaction.user.roles):
@@ -134,50 +128,45 @@ class MotivoModal(discord.ui.Modal):
         self.member, self.tipo = member, tipo
         self.motivo = discord.ui.TextInput(label="Motivo", style=discord.TextStyle.paragraph, required=True, max_length=500)
         self.add_item(self.motivo)
-
     async def on_submit(self, interaction: discord.Interaction):
         user_id = str(self.member.id)
-
         if self.tipo == "aprovado":
-            dm_embed = discord.Embed(
-                title="✅ WHITELIST APROVADA - PARADOX RP",
-                description=f"Olá {self.member.name}, sua whitelist foi **APROVADA**!\n\n**Motivo:** {self.motivo.value}\n\nBem-vindo ao servidor! Leia as regras e bom RP.",
-                color=0x00ff00
-            )
+            dm_embed = discord.Embed(title="✅ WHITELIST APROVADA - PARADOX RP", description=f"Olá {self.member.name}, sua whitelist foi **APROVADA**!\n\n**Motivo:** {self.motivo.value}\n\nBem-vindo ao servidor! Leia as regras e bom RP.", color=0x00ff00)
             if interaction.guild.icon: dm_embed.set_thumbnail(url=interaction.guild.icon.url)
-
             role = discord.utils.get(interaction.guild.roles, name="Membro")
             if role: await self.member.add_roles(role)
             if user_id in respostas_ticket and len(respostas_ticket[user_id]) >= 15:
                 nick = respostas_ticket[user_id][14]
                 try: await self.member.edit(nick=nick[:32])
                 except: pass
-
             await enviar_log("WHITELIST APROVADA", self.member, interaction.user, self.motivo.value, "logs-rp")
             await interaction.response.send_message(f"✅ {self.member.mention} aprovado! Apagando ticket em 3s...", ephemeral=True)
-
         else:
-            dm_embed = discord.Embed(
-                title="❌ WHITELIST REPROVADA - PARADOX RP",
-                description=f"Olá {self.member.name}, infelizmente sua whitelist foi **REPROVADA**.\n\n**Motivo:** {self.motivo.value}\n\nVocê pode abrir outro ticket após corrigir o motivo acima.",
-                color=0xff0000
-            )
+            dm_embed = discord.Embed(title="❌ WHITELIST REPROVADA - PARADOX RP", description=f"Olá {self.member.name}, infelizmente sua whitelist foi **REPROVADA**.\n\n**Motivo:** {self.motivo.value}\n\nVocê pode abrir outro ticket após corrigir o motivo acima.", color=0xff0000)
             if interaction.guild.icon: dm_embed.set_thumbnail(url=interaction.guild.icon.url)
-
             await enviar_log("WHITELIST REPROVADA", self.member, interaction.user, self.motivo.value, "logs-rp")
             await interaction.response.send_message(f"❌ {self.member.mention} reprovado! Apagando ticket em 3s...", ephemeral=True)
-
         try:
             await self.member.send(embed=dm_embed)
         except discord.Forbidden:
             await interaction.followup.send(f"⚠️ Não consegui mandar DM para {self.member.mention}. DM fechada.", ephemeral=True)
         except Exception as e:
             print(f"Erro ao enviar DM: {e}")
-
         await asyncio.sleep(3)
         if user_id in tickets_abertos: del tickets_abertos[user_id]
         if user_id in respostas_ticket: del respostas_ticket[user_id]
         await interaction.channel.delete()
+
+@bot.event
+async def on_message_delete(message):
+    if message.author.bot: return
+    canal_log = discord.utils.get(message.guild.channels, name="logs")
+    if canal_log:
+        embed = discord.Embed(title="🗑️ MENSAGEM APAGADA", color=0xffa500, timestamp=discord.utils.utcnow())
+        embed.add_field(name="Autor", value=message.author.mention, inline=True)
+        embed.add_field(name="Canal", value=message.channel.mention, inline=True)
+        embed.add_field(name="Conteúdo", value=message.content[:1024] if message.content else "*Embed/Anexo*", inline=False)
+        await canal_log.send(embed=embed)
 
 @bot.event
 async def on_guild_channel_delete(channel):
@@ -226,14 +215,14 @@ async def on_message(message):
                 if num < len(PERGUNTAS):
                     await message.channel.send(f"✅ Anotado! Pergunta {num + 1}: **{PERGUNTAS[num]}**")
                 else:
-                    await message.channel.send("✅ Todas as 16 perguntas respondidas! Aguarde um staff de <@&1527693962553331772> para Aprovar/Reprovar.")
+                    await message.channel.send(f"✅ Todas as 16 perguntas respondidas! Aguarde um staff de {STAFF_MENTION} para Aprovar/Reprovar.")
     await bot.process_commands(message)
 
 @bot.command()
 async def cmds(ctx):
     embed = discord.Embed(title="📜 PAINEL DE COMANDOS - PARADOX RP", color=0x3498db)
     embed.add_field(name="🎫 PAINÉIS - `Administrador`", value="`!painelwhitelist`\n`!painelstaff`\n`!painelinfo`\n`!painelanti`", inline=False)
-    embed.add_field(name="👮 STAFF - Cargo <@&1527693962553331772>", value="`!algemar @user`\n`!warn @user motivo`\n`!buscar @user`", inline=False)
+    embed.add_field(name=f"👮 STAFF - Cargo {STAFF_MENTION}", value="`!algemar @user`\n`!warn @user motivo`\n`!buscar @user`", inline=False)
     embed.add_field(name="🔨 ADMIN - `Banir/Expulsar`", value="`!ban @user motivo`\n`!kick @user motivo`", inline=False)
     embed.add_field(name="ℹ️ GERAL", value="`!cmds` - Mostra este painel", inline=False)
     await ctx.send(embed=embed)
@@ -269,14 +258,14 @@ async def algemar(ctx, member: discord.Member):
 @commands.has_permissions(ban_members=True)
 async def ban(ctx, member: discord.Member, *, reason="Sem motivo"):
     await member.ban(reason=reason)
-    await enviar_log("BAN", member, ctx.author, reason, "logs-ban")
+    await enviar_log("BAN", member, ctx.author, reason, "logs-ban") # AGORA VAI EM logs-ban
     await ctx.send(f"🔨 {member.mention} foi banido.\nMotivo: {reason}")
 
 @bot.command()
 @commands.has_permissions(kick_members=True)
 async def kick(ctx, member: discord.Member, *, reason="Sem motivo"):
     await member.kick(reason=reason)
-    await enviar_log("KICK", member, ctx.author, reason, "logs-kick")
+    await enviar_log("KICK", member, ctx.author, reason, "logs-kick") # AGORA VAI EM logs-kick
     await ctx.send(f"👢 {member.mention} foi expulso.\nMotivo: {reason}")
 
 @bot.command()
@@ -287,14 +276,14 @@ async def warn(ctx, member: discord.Member, *, motivo):
     warns[user_id].append(motivo)
     salvar_warns()
     total = len(warns[user_id])
-    await enviar_log("WARN", member, ctx.author, f"{motivo} | Total: {total}/3", "logs-warn")
+    await enviar_log("WARN", member, ctx.author, f"{motivo} | Total: {total}/3", "logs-warn") # AGORA VAI EM logs-warn
     await ctx.send(f"⚠️ {member.mention} recebeu warn. Total: **{total}/3**")
 
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def painelwhitelist(ctx):
     canal = discord.utils.get(ctx.guild.channels, name="whitelist") or await ctx.guild.create_text_channel("whitelist")
-    await canal.send(embed=discord.Embed(title="🎫 SISTEMA DE WHITELIST", description="Clique no botão abaixo para iniciar sua whitelist\n\n⚠️ Você só pode ter 1 ticket aberto por vez", color=0x00ff00), view=WhitelistButton())
+    await canal.send(embed=discord.Embed(title="🎫 SISTEMA DE WHITELIST", description="Clique no botão abaixo para iniciar sua whitelist\n⚠️ Você só pode ter 1 ticket aberto por vez", color=0x00ff00), view=WhitelistButton())
     await ctx.send(f"✅ Painel criado em {canal.mention}")
 
 @bot.command()
@@ -304,7 +293,7 @@ async def painelanti(ctx):
     canal = discord.utils.get(ctx.guild.channels, name="logs-antisabotagem")
     embed = discord.Embed(title="🚨 PAINEL ANTI-SABOTAGEM", description="Quem apagar canal ou cargo perde todos os cargos e leva DM", color=0x8b0000)
     await canal.send(embed=embed)
-    await ctx.send("✅ Categoria `PUNIÇÕES` criada com sucesso!")
+    await ctx.send("✅ Categoria `PUNIÇÕES` criada com todos os logs separados!")
 
 @bot.command()
 @commands.has_permissions(administrator=True)
