@@ -20,10 +20,18 @@ intents.guilds = True
 intents.presences = True
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
+STAFF_ROLE_ID = 1527693962553331772 # ID COMPLETO DO CARGO
+STAFF_MENTION = f"<@&{STAFF_ROLE_ID}>" # VAI PINGAR CERTO AGORA
+
 ARQUIVO_WARNS = 'warns.json'
 try: warns = json.load(open(ARQUIVO_WARNS, 'r'))
 except: warns = {}
 def salvar_warns(): json.dump(warns, open(ARQUIVO_WARNS, 'w'))
+
+def is_staff():
+    async def predicate(ctx):
+        return any(role.id == STAFF_ROLE_ID for role in ctx.author.roles)
+    return commands.check(predicate)
 
 async def criar_categoria_punicoes(guild):
     category = discord.utils.get(guild.categories, name="PUNIÇÕES")
@@ -50,7 +58,6 @@ tickets_abertos = {}
 respostas_ticket = {}
 PERGUNTAS = ["1. Nome RP?", "2. Idade?", "3. Leu as regras?", "4. O que é RP?", "5. FailRP?", "6. MetaGaming?", "7. PowerGaming?", "8. Jogou em outro servidor?", "9. Personagem?", "10. Abordado pela PM?", "11. Assaltado?", "12. Tem mic?", "13. Horas por dia?", "14. Promete não usar cheat?", "15. Nick Discord?", "16. Porque aceitar?"]
 
-# ===== BOTOES =====
 class WhitelistButton(discord.ui.View):
     def __init__(self): super().__init__(timeout=None)
     @discord.ui.button(label="Fazer Whitelist", style=discord.ButtonStyle.green, emoji="✅", custom_id="btn_whitelist_001")
@@ -69,21 +76,26 @@ class StaffButton(discord.ui.View):
     async def chamar_staff(self, interaction: discord.Interaction, button: discord.ui.Button):
         if str(interaction.user.id) in tickets_abertos: return await interaction.response.send_message("❌ Já tem chamado aberto!", ephemeral=True)
         category = discord.utils.get(interaction.guild.categories, name="ATENDIMENTO") or await interaction.guild.create_category("ATENDIMENTO")
-        role_staff = discord.utils.get(interaction.guild.roles, name="Staff")
+        role_staff = interaction.guild.get_role(STAFF_ROLE_ID)
         overwrites = {interaction.guild.default_role: discord.PermissionOverwrite(view_channel=False), interaction.user: discord.PermissionOverwrite(view_channel=True), interaction.guild.me: discord.PermissionOverwrite(view_channel=True)}
         if role_staff: overwrites[role_staff] = discord.PermissionOverwrite(view_channel=True)
         channel = await interaction.guild.create_text_channel(f"atendimento-{interaction.user.name}", category=category, overwrites=overwrites)
         tickets_abertos[str(interaction.user.id)] = channel.id
-        staff_mention = role_staff.mention if role_staff else "@Staff"
-        await channel.send(f"{staff_mention} {interaction.user.mention} abriu um chamado!")
+        await channel.send(f"{STAFF_MENTION} {interaction.user.mention} abriu um chamado!") # PINGA O CARGO CERTO
         await interaction.response.send_message(f"✅ Atendimento aberto: {channel.mention}", ephemeral=True)
 
 class TicketCloseView(discord.ui.View):
     def __init__(self): super().__init__(timeout=None)
     @discord.ui.button(label="Aprovar", style=discord.ButtonStyle.green, emoji="✅", custom_id="btn_aprovar_001")
-    async def aprovar(self, interaction: discord.Interaction, button: discord.ui.Button): await interaction.response.send_modal(MotivoModal(interaction.channel.members[1], "aprovado"))
+    async def aprovar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not any(role.id == STAFF_ROLE_ID for role in interaction.user.roles):
+            return await interaction.response.send_message(f"❌ Só quem tem {STAFF_MENTION} pode aprovar!", ephemeral=True)
+        await interaction.response.send_modal(MotivoModal(interaction.channel.members[1], "aprovado"))
     @discord.ui.button(label="Reprovar", style=discord.ButtonStyle.red, emoji="❌", custom_id="btn_reprovar_001")
-    async def reprovar(self, interaction: discord.Interaction, button: discord.ui.Button): await interaction.response.send_modal(MotivoModal(interaction.channel.members[1], "reprovado"))
+    async def reprovar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not any(role.id == STAFF_ROLE_ID for role in interaction.user.roles):
+            return await interaction.response.send_message(f"❌ Só quem tem {STAFF_MENTION} pode reprovar!", ephemeral=True)
+        await interaction.response.send_modal(MotivoModal(interaction.channel.members[1], "reprovado"))
 
 class MotivoModal(discord.ui.Modal):
     def __init__(self, member, tipo):
@@ -113,7 +125,6 @@ class MotivoModal(discord.ui.Modal):
         if user_id in respostas_ticket: del respostas_ticket[user_id]
         await interaction.channel.delete()
 
-# ===== ANTI SABOTAGEM =====
 @bot.event
 async def on_guild_channel_delete(channel):
     await asyncio.sleep(1)
@@ -160,7 +171,7 @@ async def on_message(message):
     await bot.process_commands(message)
 
 @bot.command()
-@commands.has_permissions(manage_roles=True)
+@is_staff()
 async def algemar(ctx, member: discord.Member):
     role_algema = discord.utils.get(ctx.guild.roles, name="Algemado")
     if not role_algema: role_algema = await ctx.guild.create_role(name="Algemado", color=0x808080)
@@ -188,7 +199,7 @@ async def kick(ctx, member: discord.Member, *, reason="Sem motivo"):
     await ctx.send(f"👢 {member.mention} foi expulso.\nMotivo: {reason}")
 
 @bot.command()
-@commands.has_permissions(manage_roles=True)
+@is_staff()
 async def warn(ctx, member: discord.Member, *, motivo):
     user_id = str(member.id)
     if user_id not in warns: warns[user_id] = []
@@ -198,7 +209,6 @@ async def warn(ctx, member: discord.Member, *, motivo):
     await enviar_log("WARN", member, ctx.author, f"{motivo} | Total: {total}/3", "logs-warn")
     await ctx.send(f"⚠️ {member.mention} recebeu warn. Total: **{total}/3**")
 
-# ===== COMANDOS DE PAINEL =====
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def painelwhitelist(ctx):
@@ -213,7 +223,7 @@ async def painelanti(ctx):
     canal = discord.utils.get(ctx.guild.channels, name="logs-antisabotagem")
     embed = discord.Embed(title="🚨 PAINEL ANTI-SABOTAGEM", description="Quem apagar canal ou cargo perde todos os cargos e leva DM", color=0x8b0000)
     await canal.send(embed=embed)
-    await ctx.send("✅ Categoria `PUNIÇÕES` e canal `logs-antisabotagem` criados com sucesso!")
+    await ctx.send("✅ Categoria `PUNIÇÕES` criada com sucesso!")
 
 @bot.command()
 @commands.has_permissions(administrator=True)
@@ -226,8 +236,6 @@ async def painelinfo(ctx):
     embed.add_field(name="📅 Criado em", value=ctx.guild.created_at.strftime('%d/%m/%Y'), inline=True)
     embed.add_field(name="🌐 IP do Servidor", value="`ip.aqui.com:30120`", inline=False)
     embed.add_field(name="⏰ Horário RP", value="Seg - Dom: 14h às 00h", inline=False)
-    embed.add_field(name="📜 Regras", value="Leia o canal #regras antes de jogar", inline=False)
-    embed.set_thumbnail(url=ctx.guild.icon.url if ctx.guild.icon else None)
     await canal.send(embed=embed)
     await ctx.send(f"✅ Painel de informações criado em {canal.mention}")
 
@@ -235,8 +243,9 @@ async def painelinfo(ctx):
 @commands.has_permissions(administrator=True)
 async def painelstaff(ctx):
     canal = discord.utils.get(ctx.guild.channels, name="staff") or await ctx.guild.create_text_channel("staff")
-    staff_online = len([m for m in ctx.guild.members if m.status!= discord.Status.offline and any(r.name == "Staff" for r in m.roles)])
-    embed = discord.Embed(title="👮 EQUIPE DE STAFF", description="Precisa de ajuda? Clique no botão abaixo", color=0xe74c3c)
+    role_staff = ctx.guild.get_role(STAFF_ROLE_ID)
+    staff_online = len([m for m in ctx.guild.members if m.status!= discord.Status.offline and role_staff in m.roles])
+    embed = discord.Embed(title="👮 EQUIPE DE STAFF", description=f"Precisa de ajuda? Clique no botão abaixo\n\nStaff: {STAFF_MENTION}", color=0xe74c3c)
     embed.add_field(name="Staff Online", value=f"**{staff_online}** online agora", inline=False)
     embed.add_field(name="Como funciona", value="1. Clique no botão\n2. Um ticket será aberto\n3. Aguarde um staff te atender", inline=False)
     await canal.send(embed=embed, view=StaffButton())
