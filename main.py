@@ -13,19 +13,19 @@ Thread(target=run).start()
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
-bot = commands.Bot(command_prefix="!", intents=intents)
+bot = commands.Bot(command_prefix="!", intents=intents, help_command=None) # DESATIVEI O HELP PADRAO
 
 @bot.event
 async def on_ready():
     print(f'{bot.user} Online 24h')
-    await bot.change_presence(activity=discord.Game(name="!help"))
+    await bot.change_presence(activity=discord.Game(name="!comandos"))
 
 @bot.command()
 async def ping(ctx): 
     await ctx.send("Pong! Bot 24h ON")
 
-@bot.command()
-async def help(ctx):
+@bot.command(name="comandos") # MUDEI DE help PARA comandos
+async def help_command(ctx):
     embed = discord.Embed(title="COMANDOS PARADOX RP", color=0x00ff00)
     embed.add_field(name="!ping", value="Testa se o bot ta online", inline=False)
     embed.add_field(name="!ticketsetup @cargo #canal", value="Cria painel de ticket", inline=False)
