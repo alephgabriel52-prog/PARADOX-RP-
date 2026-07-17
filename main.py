@@ -20,6 +20,7 @@ bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
 WEBHOOK_URL = ""
 tickets_abertos = {}
+respostas_ticket = {} # guarda as respostas
 
 async def enviar_log(tipo, user, staff, motivo, canal="logs-rp"):
     canal_logs = discord.utils.get(bot.get_all_channels(), name=canal)
@@ -29,12 +30,7 @@ async def enviar_log(tipo, user, staff, motivo, canal="logs-rp"):
         embed.add_field(name="Staff", value=staff.mention if staff else "SISTEMA", inline=True)
         embed.add_field(name="Motivo", value=motivo[:1024], inline=False)
         await canal_logs.send(embed=embed)
-    if WEBHOOK_URL!= "":
-        data = {"tipo": tipo, "jogador": str(user), "staff": str(staff), "motivo": motivo}
-        try: requests.post(WEBHOOK_URL, json=data, timeout=3)
-        except: pass
 
-# 15 PERGUNTAS DA WHITELIST
 PERGUNTAS = [
     "1. Qual seu nome RP completo?",
     "2. Qual sua idade?",
@@ -50,69 +46,71 @@ PERGUNTAS = [
     "12. Você tem microfone e sabe falar no RP?",
     "13. Quantas horas por dia você pode jogar?",
     "14. Você promete não usar cheats/mods?",
-    "15. Por que devemos te aceitar no servidor?"
+    "15. Qual será seu Nick no Discord? Ex: João Silva", # ESSA AQUI VAI VIRAR O NICK
+    "16. Por que devemos te aceitar no servidor?"
 ]
 
-# BOTÃO DO PAINEL
 class WhitelistButton(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
-
     @discord.ui.button(label="Fazer Whitelist", style=discord.ButtonStyle.green, emoji="✅", custom_id="whitelist_btn")
     async def whitelist(self, interaction: discord.Interaction, button: discord.ui.Button):
         guild = interaction.guild
         if str(interaction.user.id) in tickets_abertos:
             await interaction.response.send_message("❌ Você já tem um ticket aberto!", ephemeral=True)
             return
-
-        overwrites = {
-            guild.default_role: discord.PermissionOverwrite(view_channel=False),
-            interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True),
-            guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True)
-        }
+        overwrites = {guild.default_role: discord.PermissionOverwrite(view_channel=False), interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True), guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True)}
         category = discord.utils.get(guild.categories, name="WHITELIST")
         if not category: category = await guild.create_category("WHITELIST")
-
         channel = await guild.create_text_channel(f"ticket-{interaction.user.name}", overwrites=overwrites, category=category)
         tickets_abertos[str(interaction.user.id)] = channel.id
+        respostas_ticket[str(interaction.user.id)] = [] # cria lista pra guardar respostas
 
-        embed = discord.Embed(title="📋 FORMULÁRIO DE WHITELIST", description="Responda as 15 perguntas abaixo. Seja detalhado!", color=0x2b2d31)
-        for i, p in enumerate(PERGUNTAS):
-            embed.add_field(name=p, value="Responda aqui embaixo ↓", inline=False)
-
+        embed = discord.Embed(title="📋 FORMULÁRIO DE WHITELIST", description="Responda as 16 perguntas abaixo. 1 por mensagem", color=0x2b2d31)
+        for p in PERGUNTAS: embed.add_field(name=p, value="Aguarde a próxima pergunta", inline=False)
         view = TicketCloseView()
-        await channel.send(f"{interaction.user.mention}", embed=embed, view=view)
+        await channel.send(f"{interaction.user.mention} Bem vindo! Responda a pergunta 1:", embed=embed, view=view)
         await interaction.response.send_message(f"✅ Ticket criado: {channel.mention}", ephemeral=True)
 
-# BOTÃO DE FECHAR/APROVAR TICKET
 class TicketCloseView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
-
     @discord.ui.button(label="Aprovar", style=discord.ButtonStyle.green, emoji="✅")
     async def aprovar(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not interaction.user.guild_permissions.manage_roles:
             await interaction.response.send_message("❌ Sem permissão", ephemeral=True)
             return
         member = interaction.channel.members[1]
+        user_id = str(member.id)
         role = discord.utils.get(interaction.guild.roles, name="Membro")
         if role: await member.add_roles(role)
-        await enviar_log("WHITELIST", member, interaction.user, "Aprovado via Ticket com 15 perguntas", "logs-rp")
-        await interaction.response.send_message(f"✅ {member.mention} foi aprovado e recebeu whitelist!")
-        for k,v in tickets_abertos.items():
-            if v == interaction.channel.id: del tickets_abertos[k]; break
+
+        # MUDA O NICK AUTOMÁTICO - PEGA RESPOSTA 15
+        if user_id in respostas_ticket and len(respostas_ticket[user_id]) >= 15:
+            nick = respostas_ticket[user_id][14] # posição 14 = pergunta 15
+            try:
+                await member.edit(nick=nick[:32]) # limite do discord é 32
+                nick_msg = f"Nick alterado para: **{nick}**"
+            except:
+                nick_msg = "❌ Não consegui mudar o nick. Verifique as permissões do bot."
+        else:
+            nick_msg = "⚠️ Nick não encontrado nas respostas"
+
+        await enviar_log("WHITELIST", member, interaction.user, f"Aprovado. {nick_msg}", "logs-rp")
+        await interaction.response.send_message(f"✅ {member.mention} foi aprovado!\n{nick_msg}")
+
+        if user_id in tickets_abertos: del tickets_abertos[user_id]
+        if user_id in respostas_ticket: del respostas_ticket[user_id]
         await interaction.channel.delete()
 
     @discord.ui.button(label="Reprovar", style=discord.ButtonStyle.red, emoji="❌")
     async def reprovar(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not interaction.user.guild_permissions.manage_roles:
-            await interaction.response.send_message("❌ Sem permissão", ephemeral=True)
-            return
         member = interaction.channel.members[1]
-        await enviar_log("WHITELIST REPROVADA", member, interaction.user, "Reprovado via Ticket", "logs-rp")
+        user_id = str(member.id)
+        await enviar_log("WHITELIST REPROVADA", member, interaction.user, "Reprovado", "logs-rp")
         await interaction.response.send_message(f"❌ {member.mention} foi reprovado.")
-        for k,v in tickets_abertos.items():
-            if v == interaction.channel.id: del tickets_abertos[k]; break
+        if user_id in tickets_abertos: del tickets_abertos[user_id]
+        if user_id in respostas_ticket: del respostas_ticket[user_id]
         await interaction.channel.delete()
 
 @bot.event
@@ -122,12 +120,27 @@ async def on_ready():
     bot.add_view(TicketCloseView())
 
 @bot.event
-async def on_message_delete(message):
+async def on_message(message):
     if message.author.bot: return
-    await enviar_log("MENSAGEM APAGADA", message.author, None, f'Canal: #{message.channel.name} | {message.content[:500]}', "logs")
+    if message.channel.name.startswith("ticket-"):
+        for user_id, channel_id in tickets_abertos.items():
+            if channel_id == message.channel.id:
+                if user_id not in respostas_ticket: respostas_ticket[user_id] = []
+                respostas_ticket[user_id].append(message.content)
+                num = len(respostas_ticket[user_id])
+                if num < len(PERGUNTAS):
+                    await message.channel.send(f"✅ Anotado! Agora responda a pergunta {num + 1}: **{PERGUNTAS[num]}**")
+                else:
+                    await message.channel.send("✅ Todas as perguntas respondidas! Aguarde uma staff analisar.")
+    await bot.process_commands(message)
 
 @bot.event
-async asyncon_member_update(before, after):
+async def on_message_delete(message):
+    if message.author.bot: return
+    await enviar_log("MENSAGEM APAGADA", message.author, None, f'Canal: #{message.channel.name}', "logs")
+
+@bot.event
+async def on_member_update(before, after):
     if before.roles!= after.roles:
         await enviar_log("CARGO ALTERADO", after, None, "Cargos modificados", "logs")
         try:
@@ -140,9 +153,9 @@ async def comandos(ctx):
     embed = discord.Embed(title="📜 COMANDOS", color=0x5865F2)
     embed.add_field(name="!ban @user motivo", value="Bane o jogador", inline=False)
     embed.add_field(name="!kick @user motivo", value="Expulsa o jogador", inline=False)
-    embed.add_field(name="!painelwhitelist", value="Cria o painel de whitelist com 15 perguntas", inline=False)
+    embed.add_field(name="!painelwhitelist", value="Cria o painel de whitelist", inline=False)
     embed.add_field(name="!logs rp", value="Cria canal de logs RP", inline=False)
-    embed.add_field(name="!logs", value="Cria canal de logs anti-sabotagem", inline=False)
+    embed.add_field(name="!logs", value="Cria canal de logs geral", inline=False)
     await ctx.send(embed=embed)
 
 @bot.command()
@@ -150,7 +163,7 @@ async def comandos(ctx):
 async def painelwhitelist(ctx):
     canal = discord.utils.get(ctx.guild.channels, name="whitelist")
     if not canal: canal = await ctx.guild.create_text_channel("whitelist")
-    embed = discord.Embed(title="🎫 SISTEMA DE WHITELIST", description="Clique no botão abaixo para iniciar sua whitelist\n\n**ATENÇÃO:** São 15 perguntas. Responda com calma!", color=0x00ff00)
+    embed = discord.Embed(title="🎫 SISTEMA DE WHITELIST", description="Clique no botão abaixo para iniciar sua whitelist\n**ATENÇÃO:** São 16 perguntas. Responda 1 por vez.", color=0x00ff00)
     await canal.send(embed=embed, view=WhitelistButton())
     await ctx.send(f"✅ Painel criado em {canal.mention}")
 
