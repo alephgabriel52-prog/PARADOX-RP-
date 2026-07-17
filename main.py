@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands
 import os
+import requests
 from flask import Flask
 from threading import Thread
 
@@ -15,6 +16,8 @@ intents.message_content = True
 intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
+WEBHOOK_URL = "" # COLE A URL DO ROBLOX AQUI QUANDO O DEV TE PASSAR
+
 async def enviar_log(tipo, user, staff, motivo):
     canal_logs = discord.utils.get(bot.get_all_channels(), name="logs-rp")
     if canal_logs:
@@ -24,6 +27,12 @@ async def enviar_log(tipo, user, staff, motivo):
         embed.add_field(name="Motivo", value=motivo, inline=False)
         embed.timestamp = discord.utils.utcnow()
         await canal_logs.send(embed=embed)
+    
+    # MANDA PRO ROBLOX TAMBEM
+    if WEBHOOK_URL != "":
+        data = {"tipo": tipo, "jogador": str(user), "staff": str(staff), "motivo": motivo}
+        try: requests.post(WEBHOOK_URL, json=data, timeout=3)
+        except: print("Erro ao enviar pro Roblox")
 
 @bot.event
 async def on_ready():
@@ -50,6 +59,7 @@ async def logs(ctx, tipo=None):
         embed = discord.Embed(title="SISTEMA DE LOGS ATIVADO", color=0x00ff00)
         embed.add_field(name="Categoria", value=category.name, inline=True)
         embed.add_field(name="Canal", value=canal.mention, inline=True)
+        embed.add_field(name="URL ROBLOX", value=f"```{WEBHOOK_URL if WEBHOOK_URL else 'AINDA NÃO CONFIGURADA'}```", inline=False)
         await ctx.send(embed=embed)
     else:
         await ctx.send("Use `!logs rp`")
@@ -67,5 +77,13 @@ async def kick(ctx, member: discord.Member, *, reason="Sem motivo"):
     await member.kick(reason=reason)
     await enviar_log("KICK", member, ctx.author, reason)
     await ctx.send(f"👢 {member.mention} foi expulso. Motivo: {reason}")
+
+@bot.command()
+@commands.has_permissions(manage_roles=True)
+async def whitelist(ctx, member: discord.Member):
+    role = discord.utils.get(ctx.guild.roles, name="Membro")
+    if role: await member.add_roles(role)
+    await enviar_log("WHITELIST", member, ctx.author, "Aprovado")
+    await ctx.send(f"✅ {member.mention} recebeu whitelist")
 
 bot.run(os.getenv("TOKEN"))
