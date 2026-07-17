@@ -1,34 +1,32 @@
+import os
 import discord
 from discord.ext import commands
-import os
-import threading
 from flask import Flask
-from dotenv import load_dotenv
+import threading
 
-load_dotenv()
-
+# 1. SERVIDOR PRA NÃO DORMIR
 app = Flask('')
 
 @app.route('/')
-def index():
-    return "Bot PARADOX-RP está online"
+def home():
+    return "PARADOX RP ONLINE"
 
 def run():
-    app.run(host="0.0.0.0", port=8080)
+    app.run(host='0.0.0.0', port=8080)
 
-def manter_vivo():
+def keep_alive():
     t = threading.Thread(target=run)
     t.start()
 
-manter_vivo()
-
+# 2. SEU BOT
 intents = discord.Intents.default()
 intents.message_content = True
-bot = commands.Bot(command_prefix="!", intents=intents)
+client = commands.Bot(command_prefix='!', intents=intents)
 
-@bot.event
+@client.event
 async def on_ready():
-    print(f'PARADOX RP ONLINE: {bot.user}')
+    print(f'PARADOX RP ONLINE: {client.user}')
 
-TOKEN = os.getenv('TOKEN')
-bot.run(TOKEN)
+# 3. LIGA TUDO JUNTO
+keep_alive() # liga o site primeiro
+client.run(os.getenv('TOKEN')) # liga o bot depois
