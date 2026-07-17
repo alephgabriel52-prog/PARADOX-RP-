@@ -1,4 +1,4 @@
-importar discordia
+   import discord
 de discordia.extensao importar comandos
 importar os
 importar threading
