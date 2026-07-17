@@ -24,6 +24,7 @@ client = commands.Bot(command_prefix='!', intents=intents)
 @client.event
 async def on_ready():
     print(f'PARADOX RP ONLINE: {client.user}')
+    print('BOT CONECTADO COM SUCESSO')
 
 keep_alive()
 client.run(os.getenv('TOKEN'))
