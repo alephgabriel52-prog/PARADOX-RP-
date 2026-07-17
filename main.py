@@ -23,22 +23,20 @@ try: warns = json.load(open(ARQUIVO_WARNS, 'r'))
 except: warns = {}
 def salvar_warns(): json.dump(warns, open(ARQUIVO_WARNS, 'w'))
 
-async def get_canal_punicao(guild, tipo):
+async def criar_categoria_punicoes(guild):
     category = discord.utils.get(guild.categories, name="PUNIÇÕES")
-    if not category: category = await guild.create_category("PUNIÇÕES")
-    nome_canal = f"logs-{tipo}"
-    canal = discord.utils.get(guild.channels, name=nome_canal)
-    if not canal:
-        overwrites = {guild.default_role: discord.PermissionOverwrite(view_channel=False), guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True)}
-        canal = await guild.create_text_channel(nome_canal, category=category, overwrites=overwrites)
-    return canal
+    if not category: 
+        category = await guild.create_category("PUNIÇÕES")
+    
+    canais = ["logs-ban", "logs-kick", "logs-warn", "logs-rp"]
+    for nome in canais:
+        if not discord.utils.get(guild.channels, name=nome):
+            overwrites = {guild.default_role: discord.PermissionOverwrite(view_channel=False), guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True)}
+            await guild.create_text_channel(nome, category=category, overwrites=overwrites)
+    return category
 
-async def enviar_log(tipo, user, staff, motivo, canal_tipo="rp"):
-    guild = user.guild
-    if canal_tipo == "ban": canal = await get_canal_punicao(guild, "ban")
-    elif canal_tipo == "kick": canal = await get_canal_punicao(guild, "kick")
-    elif canal_tipo == "warn": canal = await get_canal_punicao(guild, "warn")
-    else: canal = discord.utils.get(guild.channels, name="logs-rp")
+async def enviar_log(tipo, user, staff, motivo, canal_nome):
+    canal = discord.utils.get(user.guild.channels, name=canal_nome)
     if canal:
         embed = discord.Embed(title=f"📝 LOG - {tipo}", color=0xff0000, timestamp=discord.utils.utcnow())
         embed.add_field(name="Jogador", value=user.mention, inline=True)
@@ -87,12 +85,12 @@ class MotivoModal(discord.ui.Modal):
                 except: pass
             try: await self.member.send(embed=discord.Embed(title="✅ APROVADO", description=f"Motivo: {self.motivo.value}", color=0x00ff00))
             except: pass
-            await enviar_log("WHITELIST APROVADA", self.member, interaction.user, self.motivo.value)
+            await enviar_log("WHITELIST APROVADA", self.member, interaction.user, self.motivo.value, "logs-rp")
             await interaction.response.send_message(f"✅ {self.member.mention} aprovado!", ephemeral=True)
         else:
             try: await self.member.send(embed=discord.Embed(title="❌ REPROVADO", description=f"Motivo: {self.motivo.value}", color=0xff0000))
             except: pass
-            await enviar_log("WHITELIST REPROVADA", self.member, interaction.user, self.motivo.value)
+            await enviar_log("WHITELIST REPROVADA", self.member, interaction.user, self.motivo.value, "logs-rp")
             await interaction.response.send_message(f"❌ {self.member.mention} reprovado!", ephemeral=True)
         del tickets_abertos[user_id]
         del respostas_ticket[user_id]
@@ -119,7 +117,7 @@ async def on_message(message):
                     await message.channel.send("✅ Todas respondidas! Clique em Aprovar/Reprovar e escreva o motivo.")
     await bot.process_commands(message)
 
-# ===== COMANDOS FINAIS =====
+# ===== COMANDOS =====
 
 @bot.command()
 @commands.has_permissions(manage_roles=True)
@@ -129,24 +127,24 @@ async def algemar(ctx, member: discord.Member):
     if role_algema in member.roles:
         await member.remove_roles(role_algema)
         await ctx.send(f"🔓 {member.mention} foi **desalgemado**")
-        await enviar_log("DESALGEMAR", member, ctx.author, "Liberado", "rp")
+        await enviar_log("DESALGEMAR", member, ctx.author, "Liberado", "logs-rp")
     else:
         await member.add_roles(role_algema)
         await ctx.send(f"⛓️ {member.mention} foi **algemado**")
-        await enviar_log("ALGEMAR", member, ctx.author, "Algemado para abordagem RP", "rp")
+        await enviar_log("ALGEMAR", member, ctx.author, "Algemado para abordagem RP", "logs-rp")
 
 @bot.command()
 @commands.has_permissions(ban_members=True)
 async def ban(ctx, member: discord.Member, *, reason="Sem motivo"):
     await member.ban(reason=reason)
-    await enviar_log("BAN", member, ctx.author, reason, "ban")
+    await enviar_log("BAN", member, ctx.author, reason, "logs-ban")
     await ctx.send(f"🔨 {member.mention} foi banido.\nMotivo: {reason}")
 
 @bot.command()
 @commands.has_permissions(kick_members=True)
 async def kick(ctx, member: discord.Member, *, reason="Sem motivo"):
     await member.kick(reason=reason)
-    await enviar_log("KICK", member, ctx.author, reason, "kick")
+    await enviar_log("KICK", member, ctx.author, reason, "logs-kick")
     await ctx.send(f"👢 {member.mention} foi expulso.\nMotivo: {reason}")
 
 @bot.command()
@@ -157,8 +155,10 @@ async def warn(ctx, member: discord.Member, *, motivo):
     warns[user_id].append(motivo)
     salvar_warns()
     total = len(warns[user_id])
-    await enviar_log("WARN", member, ctx.author, f"{motivo} | Total: {total}/3", "warn")
+    await enviar_log("WARN", member, ctx.author, f"{motivo} | Total: {total}/3", "logs-warn")
     await ctx.send(f"⚠️ {member.mention} recebeu warn. Total: **{total}/3**")
+
+# ===== PAINEIS NOVOS =====
 
 @bot.command()
 @commands.has_permissions(administrator=True)
@@ -166,5 +166,32 @@ async def painelwhitelist(ctx):
     canal = discord.utils.get(ctx.guild.channels, name="whitelist") or await ctx.guild.create_text_channel("whitelist")
     await canal.send(embed=discord.Embed(title="🎫 SISTEMA DE WHITELIST", description="Clique no botão abaixo", color=0x00ff00), view=WhitelistButton())
     await ctx.send(f"✅ Painel criado em {canal.mention}")
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def painelban(ctx):
+    await criar_categoria_punicoes(ctx.guild)
+    canal = discord.utils.get(ctx.guild.channels, name="logs-ban")
+    embed = discord.Embed(title="🔨 PAINEL DE BAN", description="Todos os bans serão logados aqui", color=0xff0000)
+    await canal.send(embed=embed)
+    await ctx.send("✅ Categoria `PUNIÇÕES` e canal `logs-ban` criados!")
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def painelkick(ctx):
+    await criar_categoria_punicoes(ctx.guild)
+    canal = discord.utils.get(ctx.guild.channels, name="logs-kick")
+    embed = discord.Embed(title="👢 PAINEL DE KICK", description="Todas as expulsões serão logadas aqui", color=0xffa500)
+    await canal.send(embed=embed)
+    await ctx.send("✅ Categoria `PUNIÇÕES` e canal `logs-kick` criados!")
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def painelwarn(ctx):
+    await criar_categoria_punicoes(ctx.guild)
+    canal = discord.utils.get(ctx.guild.channels, name="logs-warn")
+    embed = discord.Embed(title="⚠️ PAINEL DE WARN", description="Todos os warns serão logados aqui", color=0xffff00)
+    await canal.send(embed=embed)
+    await ctx.send("✅ Categoria `PUNIÇÕES` e canal `logs-warn` criados!")
 
 bot.run(os.getenv("TOKEN"))
