@@ -18,8 +18,6 @@ def log_policial():
     alvo = data.get('alvo')
     motivo = data.get('motivo')
     tempo = data.get('tempo') # "10m" "1h"
-
-    # MANDA PRO DISCORD
     bot.loop.create_task(enviar_log_policial(acao, policial, alvo, motivo, tempo))
     return jsonify({"status": "ok"})
 
@@ -35,7 +33,6 @@ intents.members = True
 intents.guilds = True
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
-WEBHOOK_URL = ""
 ARQUIVO_DINHEIRO = 'economia.json'
 ARQUIVO_WARNS = 'warns.json'
 ARQUIVO_FICHA = 'ficha.json'
@@ -89,30 +86,24 @@ async def enviar_log(tipo, user, staff, motivo, canal_tipo="rp", extra=""):
         await canal.send(embed=embed)
 
 async def enviar_log_policial(acao, policial_nome, alvo_nome, motivo, tempo):
-    """Função que o Roblox vai chamar"""
     for guild in bot.guilds:
         canal = await get_canal_policial(guild)
-
         if acao == "prender":
             embed = discord.Embed(title="🚔 PRISÃO REALIZADA", color=0x0000ff, timestamp=discord.utils.utcnow())
             embed.add_field(name="Policial", value=policial_nome, inline=True)
             embed.add_field(name="Preso", value=alvo_nome, inline=True)
             embed.add_field(name="Tempo", value=tempo, inline=True)
             embed.add_field(name="Motivo", value=motivo, inline=False)
-
         elif acao == "multar":
             embed = discord.Embed(title="🎫 MULTA APLICADA", color=0xffff00, timestamp=discord.utils.utcnow())
             embed.add_field(name="Policial", value=policial_nome, inline=True)
             embed.add_field(name="Multado", value=alvo_nome, inline=True)
-            embed.add_field(name="Valor", value=motivo.split('|')[0], inline=True)
-            embed.add_field(name="Motivo", value=motivo.split('|')[1], inline=False)
-
+            embed.add_field(name="Motivo/Valor", value=motivo, inline=False)
         elif acao == "apreender_carro":
             embed = discord.Embed(title="🚗 CARRO APREENDIDO", color=0xff0000, timestamp=discord.utils.utcnow())
             embed.add_field(name="Policial", value=policial_nome, inline=True)
             embed.add_field(name="Dono", value=alvo_nome, inline=True)
             embed.add_field(name="Motivo", value=motivo, inline=False)
-
         await canal.send(embed=embed)
 
 tickets_abertos = {}
@@ -134,7 +125,7 @@ SALARIOS = {"Policial": 800, "Médico": 700, "Mecânico": 600, "Taxista": 400, "
 class WhitelistButton(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
-    @discord.ui.button(label="Fazer Whitelist", style=discord.ButtonStyle.green, emoji="✅", custom_id="whitelist_btn")
+    @discord.ui.button(label="Fazer Whitelist", style=discord.ButtonStyle.green, emoji="✅", custom_id="whitelist_btn_persistente")
     async def whitelist(self, interaction: discord.Interaction, button: discord.ui.Button):
         guild = interaction.guild
         if str(interaction.user.id) in tickets_abertos:
@@ -152,12 +143,12 @@ class WhitelistButton(discord.ui.View):
 class TicketCloseView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
-    @discord.ui.button(label="Aprovar", style=discord.ButtonStyle.green, emoji="✅")
+    @discord.ui.button(label="Aprovar", style=discord.ButtonStyle.green, emoji="✅", custom_id="aprovar_whitelist_btn")
     async def aprovar(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not interaction.user.guild_permissions.manage_roles: return
         member = interaction.channel.members[1]
         await interaction.response.send_modal(MotivoModal(member, "aprovado"))
-    @discord.ui.button(label="Reprovar", style=discord.ButtonStyle.red, emoji="❌")
+    @discord.ui.button(label="Reprovar", style=discord.ButtonStyle.red, emoji="❌", custom_id="reprovar_whitelist_btn")
     async def reprovar(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not interaction.user.guild_permissions.manage_roles: return
         member = interaction.channel.members[1]
@@ -177,14 +168,20 @@ class MotivoModal(discord.ui.Modal):
             role = discord.utils.get(interaction.guild.roles, name="Membro")
             if role: await self.member.add_roles(role)
             if user_id not in economia: economia[user_id] = {"carteira": 1000, "banco": 0, "ultimo_salario": 0}
-            embed_dm = discord.Embed(title="✅ WHITELIST APROVADA", description="Parabéns! Você foi aprovado.", color=0x00ff00)
+            if user_id not in itens: itens[user_id] = []
+            if user_id in respostas_ticket and len(respostas_ticket[user_id]) >= 15:
+                nick = respostas_ticket[user_id][14]
+                try: await self.member.edit(nick=nick[:32])
+                except: pass
+            salvar_tudo()
+            embed_dm = discord.Embed(title="✅ WHITELIST APROVADA", description=f"Parabéns {self.member.name}! Você foi aprovado.", color=0x00ff00)
             embed_dm.add_field(name="Motivo", value=motivo_texto, inline=False)
             try: await self.member.send(embed=embed_dm)
             except: pass
             await enviar_log("WHITELIST APROVADA", self.member, interaction.user, motivo_texto, "rp")
             await interaction.response.send_message(f"✅ {self.member.mention} aprovado! DM enviada.", ephemeral=True)
         else:
-            embed_dm = discord.Embed(title="❌ WHITELIST REPROVADA", description="Sua whitelist foi reprovada.", color=0xff0000)
+            embed_dm = discord.Embed(title="❌ WHITELIST REPROVADA", description=f"Olá {self.member.name}, sua whitelist foi reprovada.", color=0xff0000)
             embed_dm.add_field(name="Motivo", value=motivo_texto, inline=False)
             try: await self.member.send(embed=embed_dm)
             except: pass
@@ -199,5 +196,80 @@ async def on_ready():
     print(f'{bot.user} Online 24h')
     bot.add_view(WhitelistButton())
     bot.add_view(TicketCloseView())
+
+@bot.event
+async def on_member_remove(member):
+    role_algema = discord.utils.get(member.guild.roles, name="Algemado")
+    if role_algema and role_algema in member.roles:
+        await enviar_log("COMBAT LOG", member, "SISTEMA", "Saiu do servidor algemado", "combatlog", "Punição: 3 Dias de BAN")
+        try: await member.ban(reason="Combat Log - 3 Dias", delete_message_days=0)
+        except: pass
+
+@bot.event
+async def on_message(message):
+    if message.author.bot: return
+    if message.channel.name.startswith("ticket-"):
+        for user_id, channel_id in tickets_abertos.items():
+            if channel_id == message.channel.id:
+                if user_id not in respostas_ticket: respostas_ticket[user_id] = []
+                respostas_ticket[user_id].append(message.content)
+                num = len(respostas_ticket[user_id])
+                if num < len(PERGUNTAS):
+                    await message.channel.send(f"✅ Anotado! Pergunta {num + 1}: **{PERGUNTAS[num]}**")
+                else:
+                    await message.channel.send("✅ Todas respondidas! Clique em Aprovar/Reprovar e escreva o motivo.")
+    await bot.process_commands(message)
+
+@bot.command()
+@commands.has_permissions(manage_roles=True)
+async def algemar(ctx, member: discord.Member):
+    role_algema = discord.utils.get(ctx.guild.roles, name="Algemado")
+    if not role_algema: role_algema = await ctx.guild.create_role(name="Algemado", color=0x808080)
+    if role_algema in member.roles:
+        await member.remove_roles(role_algema)
+        await ctx.send(f"🔓 {member.mention} foi **desalgemado**")
+        await enviar_log("DESALGEMAR", member, ctx.author, "Liberado", "rp")
+    else:
+        await member.add_roles(role_algema)
+        await ctx.send(f"⛓️ {member.mention} foi **algemado**. Se sair agora = 3 DIAS DE BAN")
+        await enviar_log("ALGEMAR", member, ctx.author, "Algemado para abordagem RP", "rp")
+
+@bot.command()
+@commands.has_permissions(manage_roles=True)
+async def setpolicial(ctx, member: discord.Member, *, corporacao):
+    role = discord.utils.get(ctx.guild.roles, name="Policial")
+    if not role: role = await ctx.guild.create_role(name="Policial", color=0x0000ff)
+    for r in CARGOS_RP.values():
+        role_old = discord.utils.get(ctx.guild.roles, name=r)
+        if role_old in member.roles: await member.remove_roles(role_old)
+    await member.add_roles(role)
+    extra = f"Corporação: {corporacao}\nSetado por: {ctx.author.name}"
+    await enviar_log("SET POLICIAL", member, ctx.author, f"Adicionado na PM", "rp", extra)
+    await ctx.send(f"👮 {member.mention} foi setado como **Policial**\n🏢 Corporação: **{corporacao}**")
+
+@bot.command()
+@commands.has_permissions(ban_members=True)
+async def ban(ctx, member: discord.Member, *, reason="Sem motivo"):
+    extra = f"Banido por: {ctx.author.name}\nHorário: {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+    await member.ban(reason=reason)
+    await enviar_log("BAN", member, ctx.author, reason, "ban", extra)
+    await ctx.send(f"🔨 {member.mention} foi banido.\nMotivo: {reason}")
+
+@bot.command()
+@commands.has_permissions(kick_members=True)
+async def kick(ctx, member: discord.Member, *, reason="Sem motivo"):
+    extra = f"Kickado por: {ctx.author.name}\nHorário: {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+    await member.kick(reason=reason)
+    await enviar_log("KICK", member, ctx.author, reason, "kick", extra)
+    await ctx.send(f"👢 {member.mention} foi expulso.\nMotivo: {reason}")
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def painelwhitelist(ctx):
+    canal = discord.utils.get(ctx.guild.channels, name="whitelist")
+    if not canal: canal = await ctx.guild.create_text_channel("whitelist")
+    embed = discord.Embed(title="🎫 SISTEMA DE WHITELIST", description="Clique no botão abaixo para iniciar", color=0x00ff00)
+    await canal.send(embed=embed, view=WhitelistButton())
+    await ctx.send(f"✅ Painel criado em {canal.mention}")
 
 bot.run(os.getenv("TOKEN"))
