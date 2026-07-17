@@ -362,4 +362,12 @@ async def painelstaff(ctx):
     staff_online = len([m for m in ctx.guild.members if m.status!= discord.Status.offline and role_staff in m.roles]) if role_staff else 0
     embed = discord.Embed(
         title="👮 EQUIPE DE STAFF",
-        description=f"
+        description=f"Precisa de ajuda? Clique no botão abaixo\nStaff: {STAFF_MENTION}",
+        color=0xe74c3c
+    )
+    embed.add_field(name="Staff Online", value=f"**{staff_online}** online agora", inline=False)
+    embed.add_field(name="Como funciona", value="1. Clique no botão\n2. Um ticket será aberto\n3. Aguarde um staff te atender", inline=False)
+    await canal.send(embed=embed, view=StaffButton())
+    await ctx.send(f"✅ Painel de staff criado em {canal.mention}")
+
+bot.run(os.getenv("TOKEN"))
