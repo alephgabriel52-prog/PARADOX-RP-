@@ -20,8 +20,8 @@ intents.guilds = True
 intents.presences = True
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
-STAFF_ROLE_ID = 1527693962553331772 # ID COMPLETO DO CARGO
-STAFF_MENTION = f"<@&{STAFF_ROLE_ID}>" # VAI PINGAR CERTO AGORA
+STAFF_ROLE_ID = 1527693962553331772
+STAFF_MENTION = f"<@&{STAFF_ROLE_ID}>"
 
 ARQUIVO_WARNS = 'warns.json'
 try: warns = json.load(open(ARQUIVO_WARNS, 'r'))
@@ -81,7 +81,7 @@ class StaffButton(discord.ui.View):
         if role_staff: overwrites[role_staff] = discord.PermissionOverwrite(view_channel=True)
         channel = await interaction.guild.create_text_channel(f"atendimento-{interaction.user.name}", category=category, overwrites=overwrites)
         tickets_abertos[str(interaction.user.id)] = channel.id
-        await channel.send(f"{STAFF_MENTION} {interaction.user.mention} abriu um chamado!") # PINGA O CARGO CERTO
+        await channel.send(f"{STAFF_MENTION} {interaction.user.mention} abriu um chamado!")
         await interaction.response.send_message(f"✅ Atendimento aberto: {channel.mention}", ephemeral=True)
 
 class TicketCloseView(discord.ui.View):
@@ -169,6 +169,31 @@ async def on_message(message):
                 else:
                     await message.channel.send("✅ Todas respondidas! Clique em Aprovar/Reprovar e escreva o motivo.")
     await bot.process_commands(message)
+
+# ===== NOVO COMANDO!cmds =====
+@bot.command()
+async def cmds(ctx):
+    embed = discord.Embed(title="📜 PAINEL DE COMANDOS - PARADOX RP", color=0x3498db, timestamp=discord.utils.utcnow())
+    embed.add_field(name="🎫 PAINÉIS - `Administrador`", value="`!painelwhitelist`\n`!painelstaff`\n`!painelinfo`\n`!painelanti`", inline=False)
+    embed.add_field(name="👮 STAFF - Cargo <@&1527693962553331772>", value="`!algemar @user`\n`!warn @user motivo`\n`!buscar @user`", inline=False)
+    embed.add_field(name="🔨 ADMIN - `Banir/Expulsar`", value="`!ban @user motivo`\n`!kick @user motivo`", inline=False)
+    embed.add_field(name="ℹ️ GERAL", value="`!cmds` - Mostra este painel", inline=False)
+    embed.set_footer(text="PARADOX RP Bot V4.8")
+    await ctx.send(embed=embed)
+
+# ===== NOVO COMANDO!buscar =====
+@bot.command()
+@is_staff()
+async def buscar(ctx, member: discord.Member):
+    user_id = str(member.id)
+    total_warns = len(warns.get(user_id, []))
+    embed = discord.Embed(title=f"🔍 FICHA DE {member.name.upper()}", color=0x2ecc71)
+    embed.add_field(name="ID", value=member.id, inline=True)
+    embed.add_field(name="Entrou em", value=member.joined_at.strftime('%d/%m/%Y'), inline=True)
+    embed.add_field(name="Warns", value=f"**{total_warns}/3**", inline=True)
+    if total_warns > 0:
+        embed.add_field(name="Motivos", value="\n".join(warns[user_id]), inline=False)
+    await ctx.send(embed=embed)
 
 @bot.command()
 @is_staff()
