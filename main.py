@@ -242,10 +242,15 @@ async def on_command_error(ctx, error):
 async def cmds(ctx):
     embed = discord.Embed(title="📜 PAINEL DE COMANDOS - PARADOX RP", color=0x3498db)
     embed.add_field(name="🎫 PAINÉIS - `Administrador`", value="`!painelwhitelist`\n`!painelstaff`\n`!painelinfo`\n`!painelanti`", inline=False)
-    embed.add_field(name=f"👮 EQUIPE STAFF - Cargo {STAFF_MENTION}", value="`!algemar @user`\n`!warn @user motivo`\n`!buscar @user`", inline=False)
+    embed.add_field(name=f"👮 EQUIPE STAFF - Cargo {STAFF_MENTION}", value="`!algemar @user`\n`!warn @user motivo`\n`!buscar @user`\n`!addgogo @user`\n`!listajogo`", inline=False)
     embed.add_field(name="🔨 ADMIN - `Banir/Expulsar`", value="`!ban @user motivo`\n`!kick @user motivo`", inline=False)
-    embed.add_field(name="ℹ️ GERAL", value="`!cmds` - Mostra este painel", inline=False)
-    await ctx.send(embed=embed)
+    embed.add_field(name="ℹ️ GERAL", value="`!cmds` - Mostra este painel no PV", inline=False)
+    
+    try:
+        await ctx.author.send(embed=embed)
+        await ctx.send(f"📩 {ctx.author.mention} Te mandei a lista de comandos no PV!", delete_after=3)
+    except discord.Forbidden:
+        await ctx.send(f"❌ {ctx.author.mention} Não consegui te mandar PV. Abre sua DM pra eu conseguir enviar.")
 
 @bot.command()
 @is_staff()
@@ -300,6 +305,29 @@ async def warn(ctx, member: discord.Member, *, motivo):
     await ctx.send(f"⚠️ {member.mention} recebeu warn. Total: **{total}/3**")
 
 @bot.command()
+@is_staff()
+async def addgogo(ctx, member: discord.Member):
+    """Adiciona alguém na gogo"""
+    await ctx.send(f"✅ {member.mention} foi adicionado na gogo")
+    await enviar_log("ADDGOGO", member, ctx.author, "Adicionado na gogo", "logs-rp")
+
+@bot.command()
+@is_staff()
+async def listajogo(ctx):
+    """Lista quem está na gogo"""
+    await ctx.send("📋 **Lista da Gogo:**\nNenhum player na lista ainda.")
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def painel(ctx):
+    embed = discord.Embed(title="📊 PAINEIS DISPONIVEIS", color=0x3498db)
+    embed.add_field(name="Whitelist", value="`!painelwhitelist`", inline=False)
+    embed.add_field(name="Staff", value="`!painelstaff`", inline=False)
+    embed.add_field(name="Info", value="`!painelinfo`", inline=False)
+    embed.add_field(name="Anti-Sabotagem", value="`!painelanti`", inline=False)
+    await ctx.send(embed=embed)
+
+@bot.command()
 @commands.has_permissions(administrator=True)
 async def painelwhitelist(ctx):
     canal = discord.utils.get(ctx.guild.channels, name="whitelist") or await ctx.guild.create_text_channel("whitelist")
@@ -332,10 +360,4 @@ async def painelstaff(ctx):
     canal = discord.utils.get(ctx.guild.channels, name="staff") or await ctx.guild.create_text_channel("staff")
     role_staff = ctx.guild.get_role(STAFF_ROLE_ID)
     staff_online = len([m for m in ctx.guild.members if m.status!= discord.Status.offline and role_staff in m.roles]) if role_staff else 0
-    embed = discord.Embed(title="👮 EQUIPE DE STAFF", description=f"Precisa de ajuda? Clique no botão abaixo\nStaff: {STAFF_MENTION}", color=0xe74c3c)
-    embed.add_field(name="Staff Online", value=f"**{staff_online}** online agora", inline=False)
-    embed.add_field(name="Como funciona", value="1. Clique no botão\n2. Um ticket será aberto\n3. Aguarde um staff te atender", inline=False)
-    await canal.send(embed=embed, view=StaffButton())
-    await ctx.send(f"✅ Painel de staff criado em {canal.mention}")
-
-bot.run(os.getenv("TOKEN"))
+    embed = discord.Embed(title="👮 EQUIPE DE STAFF", description=f"Precisa de a
