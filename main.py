@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands
 import os
 import json
+import asyncio
 from datetime import datetime
 from flask import Flask
 from threading import Thread
@@ -16,6 +17,7 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 intents.guilds = True
+intents.audit_logs = True
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
 ARQUIVO_WARNS = 'warns.json'
@@ -28,7 +30,7 @@ async def criar_categoria_punicoes(guild):
     if not category: 
         category = await guild.create_category("PUNIÇÕES")
     
-    canais = ["logs-ban", "logs-kick", "logs-warn", "logs-rp"]
+    canais = ["logs-ban", "logs-kick", "logs-warn", "logs-rp", "logs-antisabotagem"]
     for nome in canais:
         if not discord.utils.get(guild.channels, name=nome):
             overwrites = {guild.default_role: discord.PermissionOverwrite(view_channel=False), guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True)}
@@ -92,9 +94,33 @@ class MotivoModal(discord.ui.Modal):
             except: pass
             await enviar_log("WHITELIST REPROVADA", self.member, interaction.user, self.motivo.value, "logs-rp")
             await interaction.response.send_message(f"❌ {self.member.mention} reprovado!", ephemeral=True)
-        del tickets_abertos[user_id]
-        del respostas_ticket[user_id]
+        if user_id in tickets_abertos: del tickets_abertos[user_id]
+        if user_id in respostas_ticket: del respostas_ticket[user_id]
         await interaction.channel.delete()
+
+# ===== ANTI SABOTAGEM =====
+@bot.event
+async def on_guild_channel_delete(channel):
+    await asyncio.sleep(1)
+    async for entry in channel.guild.audit_logs(limit=1, action=discord.AuditLogAction.channel_delete):
+        if entry.user and not entry.user.bot:
+            await punir_sabotador(entry.user, f"Apagou o canal: {channel.name}", channel.guild)
+
+@bot.event
+async def on_guild_role_delete(role):
+    await asyncio.sleep(1)
+    async for entry in role.guild.audit_logs(limit=1, action=discord.AuditLogAction.role_delete):
+        if entry.user and not entry.user.bot:
+            await punir_sabotador(entry.user, f"Apagou o cargo: {role.name}", role.guild)
+
+async def punir_sabotador(member, motivo, guild):
+    try:
+        await member.edit(roles=[])
+        try: await member.send("🚨 Tá pensando que aqui é bagunça")
+        except: pass
+        await enviar_log("ANTI-SABOTAGEM", member, guild.me, motivo, "logs-antisabotagem")
+    except Exception as e:
+        print(f"Erro ao punir: {e}")
 
 @bot.event
 async def on_ready():
@@ -116,8 +142,6 @@ async def on_message(message):
                 else:
                     await message.channel.send("✅ Todas respondidas! Clique em Aprovar/Reprovar e escreva o motivo.")
     await bot.process_commands(message)
-
-# ===== COMANDOS =====
 
 @bot.command()
 @commands.has_permissions(manage_roles=True)
@@ -158,8 +182,6 @@ async def warn(ctx, member: discord.Member, *, motivo):
     await enviar_log("WARN", member, ctx.author, f"{motivo} | Total: {total}/3", "logs-warn")
     await ctx.send(f"⚠️ {member.mention} recebeu warn. Total: **{total}/3**")
 
-# ===== PAINEIS NOVOS =====
-
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def painelwhitelist(ctx):
@@ -169,29 +191,11 @@ async def painelwhitelist(ctx):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
-async def painelban(ctx):
+async def painelanti(ctx):
     await criar_categoria_punicoes(ctx.guild)
-    canal = discord.utils.get(ctx.guild.channels, name="logs-ban")
-    embed = discord.Embed(title="🔨 PAINEL DE BAN", description="Todos os bans serão logados aqui", color=0xff0000)
+    canal = discord.utils.get(ctx.guild.channels, name="logs-antisabotagem")
+    embed = discord.Embed(title="🚨 PAINEL ANTI-SABOTAGEM", description="Quem apagar canal ou cargo perde todos os cargos e leva DM", color=0x8b0000)
     await canal.send(embed=embed)
-    await ctx.send("✅ Categoria `PUNIÇÕES` e canal `logs-ban` criados!")
-
-@bot.command()
-@commands.has_permissions(administrator=True)
-async def painelkick(ctx):
-    await criar_categoria_punicoes(ctx.guild)
-    canal = discord.utils.get(ctx.guild.channels, name="logs-kick")
-    embed = discord.Embed(title="👢 PAINEL DE KICK", description="Todas as expulsões serão logadas aqui", color=0xffa500)
-    await canal.send(embed=embed)
-    await ctx.send("✅ Categoria `PUNIÇÕES` e canal `logs-kick` criados!")
-
-@bot.command()
-@commands.has_permissions(administrator=True)
-async def painelwarn(ctx):
-    await criar_categoria_punicoes(ctx.guild)
-    canal = discord.utils.get(ctx.guild.channels, name="logs-warn")
-    embed = discord.Embed(title="⚠️ PAINEL DE WARN", description="Todos os warns serão logados aqui", color=0xffff00)
-    await canal.send(embed=embed)
-    await ctx.send("✅ Categoria `PUNIÇÕES` e canal `logs-warn` criados!")
+    await ctx.send("✅ Categoria `PUNIÇÕES` e canal `logs-antisabotagem` criados com sucesso!")
 
 bot.run(os.getenv("TOKEN"))
