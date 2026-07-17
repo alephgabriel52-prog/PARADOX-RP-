@@ -16,8 +16,7 @@ Thread(target=run).start()
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
-intents.guilds = True
-intents.audit_logs = True
+intents.guilds = True # TIREI O audit_logs DAQUI
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
 ARQUIVO_WARNS = 'warns.json'
@@ -98,7 +97,7 @@ class MotivoModal(discord.ui.Modal):
         if user_id in respostas_ticket: del respostas_ticket[user_id]
         await interaction.channel.delete()
 
-# ===== ANTI SABOTAGEM =====
+# ===== ANTI SABOTAGEM CORRIGIDO =====
 @bot.event
 async def on_guild_channel_delete(channel):
     await asyncio.sleep(1)
