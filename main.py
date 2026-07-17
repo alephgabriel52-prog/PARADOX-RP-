@@ -163,7 +163,7 @@ class MotivoModal(discord.ui.Modal):
         except Exception as e:
             print(f"Erro ao enviar DM: {e}")
         await asyncio.sleep(3)
-        if user_id in tickets_abertos: 
+        if user_id in tickets_abertos:
             del tickets_abertos[user_id]
             salvar_tickets()
         if user_id in respostas_ticket: del respostas_ticket[user_id]
@@ -245,7 +245,7 @@ async def cmds(ctx):
     embed.add_field(name=f"👮 EQUIPE STAFF - Cargo {STAFF_MENTION}", value="`!algemar @user`\n`!warn @user motivo`\n`!buscar @user`\n`!addgogo @user`\n`!listajogo`", inline=False)
     embed.add_field(name="🔨 ADMIN - `Banir/Expulsar`", value="`!ban @user motivo`\n`!kick @user motivo`", inline=False)
     embed.add_field(name="ℹ️ GERAL", value="`!cmds` - Mostra este painel no PV", inline=False)
-    
+
     try:
         await ctx.author.send(embed=embed)
         await ctx.send(f"📩 {ctx.author.mention} Te mandei a lista de comandos no PV!", delete_after=3)
@@ -361,5 +361,5 @@ async def painelstaff(ctx):
     role_staff = ctx.guild.get_role(STAFF_ROLE_ID)
     staff_online = len([m for m in ctx.guild.members if m.status!= discord.Status.offline and role_staff in m.roles]) if role_staff else 0
     embed = discord.Embed(
-        title="👮 EQUIPE DE STAFF", 
-        descript
+        title="👮 EQUIPE DE STAFF",
+        description=f"
