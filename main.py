@@ -16,7 +16,8 @@ Thread(target=run).start()
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
-intents.guilds = True # TIREI O audit_logs DAQUI
+intents.guilds = True
+intents.presences = True
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
 ARQUIVO_WARNS = 'warns.json'
@@ -26,9 +27,8 @@ def salvar_warns(): json.dump(warns, open(ARQUIVO_WARNS, 'w'))
 
 async def criar_categoria_punicoes(guild):
     category = discord.utils.get(guild.categories, name="PUNIÇÕES")
-    if not category: 
+    if not category:
         category = await guild.create_category("PUNIÇÕES")
-    
     canais = ["logs-ban", "logs-kick", "logs-warn", "logs-rp", "logs-antisabotagem"]
     for nome in canais:
         if not discord.utils.get(guild.channels, name=nome):
@@ -50,6 +50,7 @@ tickets_abertos = {}
 respostas_ticket = {}
 PERGUNTAS = ["1. Nome RP?", "2. Idade?", "3. Leu as regras?", "4. O que é RP?", "5. FailRP?", "6. MetaGaming?", "7. PowerGaming?", "8. Jogou em outro servidor?", "9. Personagem?", "10. Abordado pela PM?", "11. Assaltado?", "12. Tem mic?", "13. Horas por dia?", "14. Promete não usar cheat?", "15. Nick Discord?", "16. Porque aceitar?"]
 
+# ===== BOTOES =====
 class WhitelistButton(discord.ui.View):
     def __init__(self): super().__init__(timeout=None)
     @discord.ui.button(label="Fazer Whitelist", style=discord.ButtonStyle.green, emoji="✅", custom_id="btn_whitelist_001")
@@ -62,6 +63,21 @@ class WhitelistButton(discord.ui.View):
         await channel.send(f"{interaction.user.mention} Pergunta 1: **{PERGUNTAS[0]}**", view=TicketCloseView())
         await interaction.response.send_message(f"✅ Ticket: {channel.mention}", ephemeral=True)
 
+class StaffButton(discord.ui.View):
+    def __init__(self): super().__init__(timeout=None)
+    @discord.ui.button(label="Chamar Staff", style=discord.ButtonStyle.red, emoji="🚨", custom_id="btn_chamar_staff")
+    async def chamar_staff(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if str(interaction.user.id) in tickets_abertos: return await interaction.response.send_message("❌ Já tem chamado aberto!", ephemeral=True)
+        category = discord.utils.get(interaction.guild.categories, name="ATENDIMENTO") or await interaction.guild.create_category("ATENDIMENTO")
+        role_staff = discord.utils.get(interaction.guild.roles, name="Staff")
+        overwrites = {interaction.guild.default_role: discord.PermissionOverwrite(view_channel=False), interaction.user: discord.PermissionOverwrite(view_channel=True), interaction.guild.me: discord.PermissionOverwrite(view_channel=True)}
+        if role_staff: overwrites[role_staff] = discord.PermissionOverwrite(view_channel=True)
+        channel = await interaction.guild.create_text_channel(f"atendimento-{interaction.user.name}", category=category, overwrites=overwrites)
+        tickets_abertos[str(interaction.user.id)] = channel.id
+        staff_mention = role_staff.mention if role_staff else "@Staff"
+        await channel.send(f"{staff_mention} {interaction.user.mention} abriu um chamado!")
+        await interaction.response.send_message(f"✅ Atendimento aberto: {channel.mention}", ephemeral=True)
+
 class TicketCloseView(discord.ui.View):
     def __init__(self): super().__init__(timeout=None)
     @discord.ui.button(label="Aprovar", style=discord.ButtonStyle.green, emoji="✅", custom_id="btn_aprovar_001")
@@ -70,7 +86,7 @@ class TicketCloseView(discord.ui.View):
     async def reprovar(self, interaction: discord.Interaction, button: discord.ui.Button): await interaction.response.send_modal(MotivoModal(interaction.channel.members[1], "reprovado"))
 
 class MotivoModal(discord.ui.Modal):
-    def __init__(self, member, tipo): 
+    def __init__(self, member, tipo):
         super().__init__(title=f"Motivo {tipo}")
         self.member, self.tipo = member, tipo
         self.motivo = discord.ui.TextInput(label="Motivo", style=discord.TextStyle.paragraph, required=True, max_length=500)
@@ -97,7 +113,7 @@ class MotivoModal(discord.ui.Modal):
         if user_id in respostas_ticket: del respostas_ticket[user_id]
         await interaction.channel.delete()
 
-# ===== ANTI SABOTAGEM CORRIGIDO =====
+# ===== ANTI SABOTAGEM =====
 @bot.event
 async def on_guild_channel_delete(channel):
     await asyncio.sleep(1)
@@ -126,13 +142,14 @@ async def on_ready():
     print(f'{bot.user} Online')
     bot.add_view(WhitelistButton())
     bot.add_view(TicketCloseView())
+    bot.add_view(StaffButton())
 
 @bot.event
 async def on_message(message):
     if message.author.bot: return
-    if message.channel.name.startswith("ticket-"):
+    if message.channel.name.startswith("ticket-") or message.channel.name.startswith("atendimento-"):
         for user_id, channel_id in tickets_abertos.items():
-            if channel_id == message.channel.id:
+            if channel_id == message.channel.id and message.channel.name.startswith("ticket-"):
                 if user_id not in respostas_ticket: respostas_ticket[user_id] = []
                 respostas_ticket[user_id].append(message.content)
                 num = len(respostas_ticket[user_id])
@@ -181,11 +198,12 @@ async def warn(ctx, member: discord.Member, *, motivo):
     await enviar_log("WARN", member, ctx.author, f"{motivo} | Total: {total}/3", "logs-warn")
     await ctx.send(f"⚠️ {member.mention} recebeu warn. Total: **{total}/3**")
 
+# ===== COMANDOS DE PAINEL =====
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def painelwhitelist(ctx):
     canal = discord.utils.get(ctx.guild.channels, name="whitelist") or await ctx.guild.create_text_channel("whitelist")
-    await canal.send(embed=discord.Embed(title="🎫 SISTEMA DE WHITELIST", description="Clique no botão abaixo", color=0x00ff00), view=WhitelistButton())
+    await canal.send(embed=discord.Embed(title="🎫 SISTEMA DE WHITELIST", description="Clique no botão abaixo para iniciar sua whitelist", color=0x00ff00), view=WhitelistButton())
     await ctx.send(f"✅ Painel criado em {canal.mention}")
 
 @bot.command()
@@ -196,5 +214,32 @@ async def painelanti(ctx):
     embed = discord.Embed(title="🚨 PAINEL ANTI-SABOTAGEM", description="Quem apagar canal ou cargo perde todos os cargos e leva DM", color=0x8b0000)
     await canal.send(embed=embed)
     await ctx.send("✅ Categoria `PUNIÇÕES` e canal `logs-antisabotagem` criados com sucesso!")
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def painelinfo(ctx):
+    canal = discord.utils.get(ctx.guild.channels, name="informacoes") or await ctx.guild.create_text_channel("informacoes")
+    membros = ctx.guild.member_count
+    embed = discord.Embed(title="📢 INFORMAÇÕES DO SERVIDOR", color=0x3498db, timestamp=discord.utils.utcnow())
+    embed.add_field(name="👑 Dono", value=ctx.guild.owner.mention, inline=True)
+    embed.add_field(name="👥 Membros", value=f"{membros}", inline=True)
+    embed.add_field(name="📅 Criado em", value=ctx.guild.created_at.strftime('%d/%m/%Y'), inline=True)
+    embed.add_field(name="🌐 IP do Servidor", value="`ip.aqui.com:30120`", inline=False)
+    embed.add_field(name="⏰ Horário RP", value="Seg - Dom: 14h às 00h", inline=False)
+    embed.add_field(name="📜 Regras", value="Leia o canal #regras antes de jogar", inline=False)
+    embed.set_thumbnail(url=ctx.guild.icon.url if ctx.guild.icon else None)
+    await canal.send(embed=embed)
+    await ctx.send(f"✅ Painel de informações criado em {canal.mention}")
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def painelstaff(ctx):
+    canal = discord.utils.get(ctx.guild.channels, name="staff") or await ctx.guild.create_text_channel("staff")
+    staff_online = len([m for m in ctx.guild.members if m.status!= discord.Status.offline and any(r.name == "Staff" for r in m.roles)])
+    embed = discord.Embed(title="👮 EQUIPE DE STAFF", description="Precisa de ajuda? Clique no botão abaixo", color=0xe74c3c)
+    embed.add_field(name="Staff Online", value=f"**{staff_online}** online agora", inline=False)
+    embed.add_field(name="Como funciona", value="1. Clique no botão\n2. Um ticket será aberto\n3. Aguarde um staff te atender", inline=False)
+    await canal.send(embed=embed, view=StaffButton())
+    await ctx.send(f"✅ Painel de staff criado em {canal.mention}")
 
 bot.run(os.getenv("TOKEN"))
