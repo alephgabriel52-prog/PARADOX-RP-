@@ -1,35 +1,34 @@
-   import discord
-de discordia.extensao importar comandos
-importar os
-importar threading
-de flask importar Flask
+import discord
+from discord.ext import commands
+import os
+import threading
+from flask import Flask
+from dotenv import load_dotenv
 
-aplicativo = Flask('')
+load_dotenv()
 
-@aplicativo.rota('/')
-def lar():
-    devolver "Bot PARADOX-RP está online"
+app = Flask('')
 
-def correr():
-    aplicativo.correr(hospedar="0.0.0.0", porta=10000)
+@app.route('/')
+def index():
+    return "Bot PARADOX-RP está online"
+
+def run():
+    app.run(host="0.0.0.0", port=8080)
 
 def manter_vivo():
-    t = threading.Fio(alvo=correr)
-    t.iniciar()
+    t = threading.Thread(target=run)
+    t.start()
 
 manter_vivo()
 
+intents = discord.Intents.default()
+intents.message_content = True
+bot = commands.Bot(command_prefix="!", intents=intents)
 
-quero = discordia.quero.todos()
-robô = comandos.Robô(prefixo_de_comando="!")
+@bot.event
+async def on_ready():
+    print(f'PARADOX RP ONLINE: {bot.user}')
 
-@robô.evento
-assincrono definicao pronto():
-    imprimir(f'PARADOX RP ONLINE:{robô.usuario}')
-
-@robô.comando()
-assincrono definicao ping(ctx):
-    aguardar ctx.enviar('Pong! Bot online')
-
-FICHA = os.pegar_var_ambiente('TOKEN')
-robô.correr(FICHA)
+TOKEN = os.getenv('TOKEN')
+bot.run(TOKEN)
