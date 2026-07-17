@@ -360,4 +360,6 @@ async def painelstaff(ctx):
     canal = discord.utils.get(ctx.guild.channels, name="staff") or await ctx.guild.create_text_channel("staff")
     role_staff = ctx.guild.get_role(STAFF_ROLE_ID)
     staff_online = len([m for m in ctx.guild.members if m.status!= discord.Status.offline and role_staff in m.roles]) if role_staff else 0
-    embed = discord.Embed(title="👮 EQUIPE DE STAFF", description=f"Precisa de a
+    embed = discord.Embed(
+        title="👮 EQUIPE DE STAFF", 
+        descript
