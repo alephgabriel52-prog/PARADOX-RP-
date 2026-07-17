@@ -25,6 +25,5 @@ client = commands.Bot(command_prefix='!', intents=intents)
 async def on_ready():
     print(f'PARADOX RP ONLINE: {client.user}')
 
-if __name__ == "__main__":
-    keep_alive()
-    client.run(os.getenv('TOKEN'))
+keep_alive()
+client.run(os.getenv('TOKEN'))
