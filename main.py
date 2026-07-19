@@ -333,25 +333,22 @@ async def listajogo(ctx):
     """Lista quem está na gogo"""
     await ctx.send("📋 **Lista da Gogo:**\nNenhum player na lista ainda.")
 
+async def painel(ctx):
 @bot.command()
+@commands.has_permissions(administrator=True)
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def painel(ctx):
-    embed = discord.Embed(
+    ed = discord.Embed(
         title="🏠 Painel Principal - PARADOXO RP",
         description="Precisa de ajuda? Escolha uma opção abaixo:",
         color=0x9B59B6
     )
-
-    view = discord.ui.View()
-    view.add_item(discord.ui.Button(label="Suporte", emoji="🎫", style=discord.ButtonStyle.gray, custom_id="suporte"))
-    view.add_item(discord.ui.Button(label="Denunciar", emoji="🚨", style=discord.ButtonStyle.red, custom_id="denuncia"))
-    view.add_item(discord.ui.Button(label="Loja/VIP", emoji="💎", style=discord.ButtonStyle.green, custom_id="loja"))
-
-    await ctx.send(embed=embed, view=view)
-
-@bot.command()
-@bot.command()
+    a = discord.ui.View()
+    a.add_item(discord.ui.Button(label="Suporte", emoji="🎫", style=discord.ButtonStyle.gray, custom_id="suporte"))
+    a.add_item(discord.ui.Button(label="Denunciar", emoji="🚨", style=discord.ButtonStyle.red, custom_id="denuncia"))
+    a.add_item(discord.ui.Button(label="Loja/VIP", emoji="💎", style=discord.ButtonStyle.green, custom_id="loja"))
+    await ctx.send(embed=ed, view=a)
 @commands.has_permissions(administrator=True)
 async def painelwhitelist(ctx):
     embed = discord.Embed(title="📋 SISTEMA DE WHITELIST", description="Clique no botão abaixo para iniciar a whitelist com 15 perguntas", color=0x2ECC71)
@@ -363,10 +360,7 @@ async def painelwhitelist(ctx):
 @commands.has_permissions(administrator=True)
 async def painelanti(ctx):
     await criar_categoria_punicoes(ctx.guild)
-    await ctx.send("✅ Categoria `PUNIÇÕES` criada com todos os logs!")
-
-@bot.command()
-@commands.has_permissions(administrator=True)
+    
 async def painelinfo(ctx):
     canal = discord.utils.get(ctx.guild.channels, name="informacoes") or await ctx.guild.create_text_channel("informacoes")
     membros = ctx.guild.member_count
