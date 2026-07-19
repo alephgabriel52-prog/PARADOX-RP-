@@ -20,7 +20,7 @@ intents.guilds = True
 intents.presences = True
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
-STAFF_ROLE_ID = 1526291626027384904 # CARGO EQUIPE STAFF
+STAFF_ROLE_ID = 1528409545439969433  # CARGO EQUIPE STAFF
 STAFF_MENTION = "<@&{}>".format(STAFF_ROLE_ID)
 
 ARQUIVO_WARNS = 'warns.json'
