@@ -24,20 +24,28 @@ STAFF_ROLE_ID = 1528409545439969433
 STAFF_MENTION = "<@&{}>".format(STAFF_ROLE_ID)
 CATEGORIA_NORMAL = 1528445353022455951
 CATEGORIA_LOJA = 1528506502791430144
-CATEGORIA_WHITELIST = 1528409546148544572 # ID QUE VC MANDOU
+CATEGORIA_WHITELIST = 1528409546148544572
 
 ARQUIVO_WARNS = 'warns.json'
 ARQUIVO_TICKETS = 'tickets.json'
+ARQUIVO_ASSUMIDOS = 'assumidos.json'
+
 try:
     with open(ARQUIVO_WARNS, 'r', encoding='utf-8') as f: warns = json.load(f)
 except: warns = {}
 try:
     with open(ARQUIVO_TICKETS, 'r', encoding='utf-8') as f: tickets_abertos = json.load(f)
 except: tickets_abertos = {}
+try:
+    with open(ARQUIVO_ASSUMIDOS, 'r', encoding='utf-8') as f: tickets_assumidos = json.load(f)
+except: tickets_assumidos = {}
+
 respostas_ticket = {}
 
 def salvar_tickets():
     with open(ARQUIVO_TICKETS, 'w', encoding='utf-8') as f: json.dump(tickets_abertos, f, ensure_ascii=False, indent=4)
+def salvar_assumidos():
+    with open(ARQUIVO_ASSUMIDOS, 'w', encoding='utf-8') as f: json.dump(tickets_assumidos, f, ensure_ascii=False, indent=4)
 
 async def ja_tem_ticket(guild, user, interaction):
     user_id = str(user.id)
@@ -59,19 +67,40 @@ class TicketPainelView(discord.ui.View):
             if cid == interaction.channel.id:
                 return interaction.guild.get_member(int(uid))
         return None
+
     @discord.ui.button(label="Assumir Ticket", style=discord.ButtonStyle.primary, emoji="👮", custom_id="assumir_ticket")
     async def assumir(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not any(role.id == STAFF_ROLE_ID for role in interaction.user.roles):
             return await interaction.response.send_message("❌ Só a equipe {} pode assumir!".format(STAFF_MENTION), ephemeral=True)
+
+        canal_id = str(interaction.channel.id)
+
+        if canal_id in tickets_assumidos:
+            staff_id = tickets_assumidos[canal_id]
+            staff = interaction.guild.get_member(int(staff_id))
+            return await interaction.response.send_message("❌ Este ticket já está sendo atendido por {}!".format(staff.mention if staff else "outro staff"), ephemeral=True)
+
+        tickets_assumidos[canal_id] = str(interaction.user.id)
+        salvar_assumidos()
         await interaction.channel.set_permissions(interaction.user, view_channel=True, send_messages=True)
         await interaction.response.send_message("{} **assumiu este ticket!**".format(interaction.user.mention))
+        await interaction.channel.send("👮 Ticket agora está sendo atendido por {}".format(interaction.user.mention))
+
     @discord.ui.button(label="Fechar Ticket", style=discord.ButtonStyle.danger, emoji="🔒", custom_id="fechar_ticket")
     async def fechar(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not any(role.id == STAFF_ROLE_ID for role in interaction.user.roles):
             return await interaction.response.send_message("❌ Só a equipe {} pode fechar!".format(STAFF_MENTION), ephemeral=True)
+
+        canal_id = str(interaction.channel.id)
         member = await self.get_ticket_owner(interaction)
+
         await interaction.response.send_message("🔒 Fechando ticket em 3 segundos...")
         await asyncio.sleep(3)
+
+        if canal_id in tickets_assumidos:
+            del tickets_assumidos[canal_id]
+            salvar_assumidos()
+
         if member:
             user_id = str(member.id)
             if user_id in tickets_abertos:
@@ -152,8 +181,43 @@ class MotivoModal(discord.ui.Modal):
         user_id = str(self.member.id)
         channel = interaction.channel
         category = channel.category
-        await interaction.response.send_message("Processando...", ephemeral=True)
+        canal_id = str(channel.id)
+
+        if self.tipo == "aprovado":
+            dm_embed = discord.Embed(title="✅ WHITELIST APROVADA - PARADOX RP", description="Olá {}, sua whitelist foi **APROVADA**!\n\n**Motivo:** {}\n\nBem-vindo ao servidor!".format(self.member.name, self.motivo.value), color=0x00ff00)
+            if interaction.guild.icon: dm_embed.set_thumbnail(url=interaction.guild.icon.url)
+
+            role = discord.utils.get(interaction.guild.roles, name="Membro")
+            if role: await self.member.add_roles(role)
+
+            # MUDA O NICK COM NOME DA PERGUNTA 1
+            if user_id in respostas_ticket and len(respostas_ticket[user_id]) >= 1:
+                nome_completo = respostas_ticket[user_id][0] # Pergunta 1
+                nick = nome_completo[:32] # Limite discord
+                try:
+                    await self.member.edit(nick=nick)
+                    await interaction.followup.send("✅ Nick alterado para: **{}**".format(nick), ephemeral=True)
+                except discord.Forbidden:
+                    await interaction.followup.send("⚠️ Não tenho permissão para mudar o nick. Coloca meu cargo acima do 'Membro'", ephemeral=True)
+                except Exception as e:
+                    print("Erro ao mudar nick: {}".format(e))
+
+            await interaction.response.send_message("✅ {} aprovado!".format(self.member.mention), ephemeral=True)
+
+        else:
+            dm_embed = discord.Embed(title="❌ WHITELIST REPROVADA - PARADOX RP", description="Olá {}, sua whitelist foi **REPROVADA**.\n\n**Motivo:** {}".format(self.member.name, self.motivo.value), color=0xff0000)
+            if interaction.guild.icon: dm_embed.set_thumbnail(url=interaction.guild.icon.url)
+            await interaction.response.send_message("❌ {} reprovado!".format(self.member.mention), ephemeral=True)
+
+        try: await self.member.send(embed=dm_embed)
+        except: pass
+
         await asyncio.sleep(3)
+
+        if canal_id in tickets_assumidos:
+            del tickets_assumidos[canal_id]
+            salvar_assumidos()
+
         if user_id in tickets_abertos:
             del tickets_abertos[user_id]
             salvar_tickets()
