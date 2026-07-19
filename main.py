@@ -65,7 +65,7 @@ async def enviar_log(tipo, user, staff, motivo, canal_nome):
         await canal.send(embed=embed)
 
 respostas_ticket = {}
-PERGUNTAS = ["1. Nome RP?", "2. Idade?", "3. Leu as regras?", "4. O que é RP?", "5. FailRP?", "6. MetaGaming?", "7. PowerGaming?", "8. Jogou em outro servidor?", "9. Personagem?", "10. Abordado pela PM?", "11. Assaltado?", "12. Tem mic?", "13. Horas por dia?", "14. Promete não usar cheat?", "15. Nick Discord?", "16. Porque aceitar?"]
+PERGUNTAS = [ "1. Qual seu nome completo e idade?",   "2. Você já jogou RP antes? Em qual(is) cidade(s)?",  "3. O que é RDM e VDM? Dê exemplos.",  "4. O que é Metagaming? Como você evita?",  "5. O que é Powergaming? Dê um exemplo.",  "6. Você está sendo roubado. O que faz para não quebrar regras?", "7. Qual a diferença entre IC e OOC? Quando usar cada um?", "8. O que você faria se visse 2 players fazendo RDM?", "9. Conte a história do seu personagem. Nome, profissão e objetivo:",  "10. Como você reage a uma abordagem policial? Cite 3 atitudes.",  "11. O que é Fear RP e como aplicar na prática?",   "12. Você pode usar informações do Discord no jogo? Explique.",  "13. Qual seu horário disponível para jogar na Cidade?", "14. Você tem microfone? Sabe fazer RP de voz?",   "15. Por que devemos te aceitar na Cidade Santa? Seja sincero."
 
 class WhitelistButton(discord.ui.View):
     def __init__(self): super().__init__(timeout=None)
