@@ -333,9 +333,6 @@ async def listajogo(ctx):
     """Lista quem está na gogo"""
     await ctx.send("📋 **Lista da Gogo:**\nNenhum player na lista ainda.")
 
-async def painel(ctx):
-@bot.command()
-@commands.has_permissions(administrator=True)
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def painel(ctx):
@@ -358,8 +355,17 @@ async def painelwhitelist(ctx):
     
 @bot.command()
 @commands.has_permissions(administrator=True)
-async def painelanti(ctx):
-    await criar_categoria_punicoes(ctx.guild)
+async def painelloja(ctx):
+    ed = discord.Embed(
+        title="💎 LOJA PARADOXO RP",
+        description="Compre seus itens VIP abaixo:",
+        color=0xF1C40F
+    )
+    a = discord.ui.View()
+    a.add_item(discord.ui.Button(label="VIP Bronze", emoji="🥉", style=discord.ButtonStyle.secondary, custom_id="vipbronze"))
+    a.add_item(discord.ui.Button(label="VIP Prata", emoji="🥈", style=discord.ButtonStyle.secondary, custom_id="vipprata"))
+    a.add_item(discord.ui.Button(label="VIP Ouro", emoji="🥇", style=discord.ButtonStyle.success, custom_id="vipouro"))
+    await ctx.send(embed=ed, view=a)
     
 async def painelinfo(ctx):
     canal = discord.utils.get(ctx.guild.channels, name="informacoes") or await ctx.guild.create_text_channel("informacoes")
