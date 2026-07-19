@@ -6,8 +6,6 @@ import asyncio
 from datetime import datetime
 from flask import Flask
 from threading import Thread
-import random
-import requests
 
 app = Flask('')
 @app.route('/')
@@ -25,7 +23,6 @@ start_time = datetime.now()
 
 # ===== CONFIG DE SEGURANÇA =====
 DONO_ID = 1438010935783460954 # SEU ID
-SERVIDORES_PERMITIDOS = [] # DEIXA VAZIO PRA SÓ VC ADICIONAR
 STAFF_ROLE_ID = 1528409545439969433
 LOG_CHANNEL_ID = None
 
@@ -75,24 +72,36 @@ def is_staff():
         return False
     return commands.check(predicate)
 
-# ===== ANTI-ROUBO =====
+# ===== ANTI-ROUBO NIVEL HARD =====
 @bot.event
 async def on_guild_join(guild):
-    if guild.id not in SERVIDORES_PERMITIDOS:
-        dono = guild.owner
-        try: await dono.send("😡 **AQUI NÃO VACILÃO TENTANDO ROUBAR BOT?**\nVira homem krl aprende a ser honesto porra\nEsse bot é privado do Biel. ID: 1438010935783460954")
+    # VERIFICA SE VOCÊ TÁ NO SERVIDOR
+    dono = guild.get_member(DONO_ID)
+
+    if not dono:
+        # VOCÊ NÃO TÁ LÁ = VAZA
+        try:
+            await guild.owner.send("😡 **AQUI NÃO VACILÃO**\nSó entro em servidor que o Biel ID: 1438010935783460954 estiver.\nSaindo em 3s...")
         except: pass
+
         for canal in guild.text_channels:
             if canal.permissions_for(guild.me).send_messages:
-                await canal.send("🚨 **BOT PRIVADO**\nSaindo em 3 segundos..."); break
-        await asyncio.sleep(3); await guild.leave(); print(f"SAÍ DO SERVIDOR NÃO AUTORIZADO: {guild.name}")
+                await canal.send("🚨 **VOCÊ NÃO É O BIEL**\nBot saindo..."); break
+        await asyncio.sleep(3)
+        await guild.leave()
+        print(f"SAÍ: {guild.name} - Biel não estava no servidor")
+    else:
+        print(f"Entrei em: {guild.name} - Biel está aqui ✅")
 
 @bot.event
 async def on_ready():
     print(f"Bot online como {bot.user}")
+    # CHECA TODOS SERVIDORES AO INICIAR
     for guild in bot.guilds:
-        if guild.id not in SERVIDORES_PERMITIDOS:
-            print(f"SAINDO DE SERVIDOR NÃO AUTORIZADO: {guild.name}"); await guild.leave()
+        dono = guild.get_member(DONO_ID)
+        if not dono:
+            print(f"SAINDO: {guild.name} - Biel não está aqui")
+            await guild.leave()
 
 async def log(ctx, acao, alvo, motivo):
     if LOG_CHANNEL_ID:
@@ -112,7 +121,6 @@ HIERARQUIA_TRIBUNAL = ["Juiz Supremo", "Desembargador", "Juiz", "Promotor", "Adv
 @bot.command()
 @is_dono()
 async def setup(ctx, tipo, *, nome):
-    #... MESMO CODIGO DE SETUP...
     guild = ctx.guild; tipo = tipo.lower(); nome_key = nome.lower(); nome_display = nome.title()
     civil_role = discord.utils.get(guild.roles, name="Civil") or await guild.create_role(name="Civil", color=discord.Color(0x95A5A6))
     config["civil_role"] = civil_role.id; staff_role = guild.get_role(STAFF_ROLE_ID)
@@ -141,31 +149,6 @@ async def setup(ctx, tipo, *, nome):
     for canal_nome in canais_voz: await guild.create_voice_channel(canal_nome, category=categoria)
     storage[nome_key] = {"cargo_id": cargos_criados[0].id, "categoria_id": categoria.id, "cargos": [c.id for c in cargos_criados]}; salvar(ARQUIVO_CONFIG, config)
     await msg.edit(content="", embed=discord.Embed(title="✅ SETUP CONCLUÍDO", description=f"{categoria.mention}", color=0x2ECC71))
-
-@bot.command()
-@is_dono()
-async def addserv(ctx, server_id: int):
-    """Libera um servidor novo"""
-    if server_id not in SERVIDORES_PERMITIDOS:
-        SERVIDORES_PERMITIDOS.append(server_id); await ctx.send(f"✅ Servidor `{server_id}` liberado!")
-    else: await ctx.send("❌ Já está liberado.")
-
-@bot.command()
-@is_dono()
-async def delserv(ctx, server_id: int):
-    """Remove servidor da lista"""
-    if server_id in SERVIDORES_PERMITIDOS:
-        SERVIDORES_PERMITIDOS.remove(server_id); await ctx.send(f"✅ Servidor `{server_id}` removido.")
-    else: await ctx.send("❌ Não está na lista.")
-
-@bot.command()
-@is_dono()
-async def listserv(ctx):
-    """Lista servidores liberados"""
-    if not SERVIDORES_PERMITIDOS: return await ctx.send("📋 Nenhum servidor liberado além deste.")
-    embed = discord.Embed(title="📋 SERVIDORES LIBERADOS", color=0x2ECC71)
-    for id in SERVIDORES_PERMITIDOS: embed.add_field(name="ID", value=id, inline=False)
-    await ctx.send(embed=embed)
 
 # ===== COMANDOS STAFF =====
 @bot.command()
@@ -214,59 +197,15 @@ async def contratar(ctx, member: discord.Member, *, cargo: discord.Role):
     if not cargo_valido: return await ctx.send("❌ Esse cargo não é de org!")
     await member.add_roles(cargo); await ctx.send(embed=discord.Embed(title="✅ CONTRATAÇÃO", description=f"{member.mention} foi contratado(a) como {cargo.mention}", color=0x2ECC71))
 
-@bot.command()
-@is_staff()
-async def demitir(ctx, member: discord.Member, *, cargo: discord.Role = None):
-    await ctx.message.delete()
-    cargos_removidos = []
-    if cargo:
-        cargo_e_da_org = any(cargo.id in org["cargos"] for orgs in [config["corps"], config["facs"], config["correg"], config["tribunal"]] for org in orgs.values())
-        if not cargo_e_da_org: return await ctx.send("❌ Esse cargo não é de org!")
-        if cargo in member.roles: await member.remove_roles(cargo); cargos_removidos.append(cargo.name); msg = f"✅ {member.mention} foi demitido do cargo {cargo.mention}"
-        else: return await ctx.send(f"❌ {member.mention} não tem esse cargo.")
-    else:
-        for orgs in [config["corps"], config["facs"], config["correg"], config["tribunal"]]:
-            for org in orgs.values():
-                for cid in org["cargos"]:
-                    c = ctx.guild.get_role(cid)
-                    if c and c in member.roles: await member.remove_roles(c); cargos_removidos.append(c.name)
-        msg = f"✅ {member.mention} foi demitido de todas as orgs.\n**Cargos removidos:** {len(cargos_removidos)}"
-    await ctx.send(embed=discord.Embed(title="📋 DEMISSÃO", description=msg, color=0xE74C3C))
-    await log(ctx, "Demitir", member, f"Cargos: {', '.join(cargos_removidos)}")
-
-@bot.command()
-@is_staff()
-async def promover(ctx, member: discord.Member): await ctx.message.delete()
-@bot.command()
-@is_staff()
-async def rebaixar(ctx, member: discord.Member): await ctx.message.delete()
-@bot.command()
-@is_staff()
-async def warn(ctx, member: discord.Member, *, motivo): await ctx.message.delete()
-@bot.command()
-@is_staff()
-async def kick(ctx, member: discord.Member, *, motivo="Sem motivo"): await ctx.message.delete()
-@bot.command()
-@is_staff()
-async def ban(ctx, member: discord.Member, *, motivo="Sem motivo"): await ctx.message.delete()
-@bot.command()
-@is_staff()
-async def relatorioponto(ctx): pass
-
 # ===== COMANDOS GERAIS =====
 @bot.command()
 async def cmds(ctx):
     embed = discord.Embed(title="📜 LISTA DE COMANDOS", color=0x5865F2)
     embed.description = f"**Dono do Bot:** <@{DONO_ID}>"
-
-    embed.add_field(name="👑 SÓ O DONO PODE", value="`!setup` `!addserv` `!delserv` `!listserv`", inline=False)
-
-    embed.add_field(name="👮 STAFF PODE USAR", value="`!contratar` `!demitir` `!transferir` `!promover` `!rebaixar`\n`!warn` `!kick` `!ban` `!mutar` `!limpar`\n`!advertencia` `!escala` `!reuniao` `!relatorioponto`\n`!bateponto` `!verponto` `!anunciar`", inline=False)
-
-    embed.add_field(name="😄 TODOS PODEM", value="`!ping` `!avatar` `!infouser` `!cmds` `!moeda` `!dado`", inline=False)
-    embed.set_footer(text="Se usar comando sem permissão recebe DM 😡")
-
-    await ctx.author.send(embed=embed)
-    await ctx.send("✅ Mandei a lista no seu PV!")
+    embed.add_field(name="👑 SÓ O DONO PODE", value="`!setup`", inline=False)
+    embed.add_field(name="👮 STAFF PODE USAR", value="`!contratar` `!demitir` `!transferir` `!promover` `!rebaixar`\n`!warn` `!kick` `!ban` `!mutar` `!limpar`\n`!advertencia` `!escala` `!reuniao`", inline=False)
+    embed.add_field(name="😄 TODOS PODEM", value="`!ping` `!avatar` `!infouser` `!cmds`", inline=False)
+    embed.set_footer(text="Trava: Só fica no serv se o biel040066 estiver 😈")
+    await ctx.author.send(embed=embed); await ctx.send("✅ Mandei a lista no seu PV!")
 
 bot.run(os.getenv("TOKEN"))
