@@ -408,6 +408,12 @@ async def on_interaction(interaction):
         msg = f"{user.mention} <@&{STAFF_ROLE_ID}>\n**Bem-vindo a Whitelist!**\n\n**Pergunta 1/15:** {PERGUNTAS[0]}"
 
     # TICKET NORMAL
+    elif custom_id == "vipbronze":
+    await criar_ticket(interaction, "vip-bronze")
+elif custom_id == "vipprata":
+    await criar_ticket(interaction, "vip-prata")
+elif custom_id == "vipouro":
+    await criar_ticket(interaction, "vip-ouro")
     else:
         categoria = discord.utils.get(guild.categories, id=1528445353022455951)
         nome = f"ticket-{custom_id}-{user.name}"
