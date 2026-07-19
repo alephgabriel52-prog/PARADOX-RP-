@@ -20,7 +20,7 @@ intents.guilds = True
 intents.presences = True
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
-STAFF_ROLE_ID = 1528409545439969433  # CARGO EQUIPE STAFF
+STAFF_ROLE_ID = 1528409545439969433 # CARGO EQUIPE STAFF
 STAFF_MENTION = "<@&{}>".format(STAFF_ROLE_ID)
 
 ARQUIVO_WARNS = 'warns.json'
@@ -185,6 +185,33 @@ class MotivoModal(discord.ui.Modal):
         if user_id in respostas_ticket: del respostas_ticket[user_id]
         await interaction.channel.delete()
 
+# VIEWS NOVAS PRA LOJA E PAINEL
+class TicketView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+    @discord.ui.button(label="Suporte", custom_id="suporte", style=discord.ButtonStyle.primary)
+    async def suporte(self, interaction, button): await criar_ticket(interaction, "suporte")
+    @discord.ui.button(label="Denuncia", custom_id="denuncia", style=discord.ButtonStyle.danger)
+    async def denuncia(self, interaction, button): await criar_ticket(interaction, "denuncia")
+    @discord.ui.button(label="Loja VIP", custom_id="loja", style=discord.ButtonStyle.success)
+    async def loja(self, interaction, button): await criar_ticket(interaction, "loja")
+
+class LojaView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+    @discord.ui.button(label="VIP Bronze", custom_id="vipbronze", style=discord.ButtonStyle.secondary)
+    async def bronze(self, interaction, button): await criar_ticket_vip(interaction, "vip-bronze")
+    @discord.ui.button(label="VIP Prata", custom_id="vipprata", style=discord.ButtonStyle.primary)
+    async def prata(self, interaction, button): await criar_ticket_vip(interaction, "vip-prata")
+    @discord.ui.button(label="VIP Ouro", custom_id="vipouro", style=discord.ButtonStyle.success)
+    async def ouro(self, interaction, button): await criar_ticket_vip(interaction, "vip-ouro")
+
+class WhitelistView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+    @discord.ui.button(label="Solicitar Whitelist", custom_id="whitelist", style=discord.ButtonStyle.success)
+    async def whitelist(self, interaction, button): await criar_ticket_whitelist(interaction)
+
 @bot.event
 async def on_message_delete(message):
     if message.author.bot: return
@@ -231,6 +258,9 @@ async def on_ready():
     bot.add_view(WhitelistButton())
     bot.add_view(TicketCloseView())
     bot.add_view(StaffButton())
+    bot.add_view(TicketView())
+    bot.add_view(LojaView())
+    bot.add_view(WhitelistView())
 
 @bot.event
 async def on_message(message):
@@ -244,7 +274,7 @@ async def on_message(message):
                 if num < len(PERGUNTAS):
                     await message.channel.send("✅ Anotado! Pergunta {}: **{}**".format(num + 1, PERGUNTAS[num]))
                 else:
-                    await message.channel.send("✅ Todas as 16 perguntas respondidas! Aguarde um membro da {} para Aprovar/Reprovar.".format(STAFF_MENTION))
+                    await message.channel.send("✅ Todas as 15 perguntas respondidas! Aguarde um membro da {} para Aprovar/Reprovar.".format(STAFF_MENTION))
     await bot.process_commands(message)
 
 @bot.event
@@ -257,11 +287,10 @@ async def on_command_error(ctx, error):
 @bot.command()
 async def cmds(ctx):
     embed = discord.Embed(title="📜 PAINEL DE COMANDOS - PARADOX RP", color=0x3498db)
-    embed.add_field(name="🎫 PAINÉIS - `Administrador`", value="`!painelwhitelist`\n`!painelstaff`\n`!painelinfo`\n`!painelanti`", inline=False)
+    embed.add_field(name="🎫 PAINÉIS - `Administrador`", value="`!painel`\n`!painelloja`\n`!painelwhitelist`\n`!painelstaff`\n`!painelinfo`", inline=False)
     embed.add_field(name="👮 EQUIPE STAFF - Cargo {}".format(STAFF_MENTION), value="`!algemar @user`\n`!warn @user motivo`\n`!buscar @user`\n`!addgogo @user`\n`!listajogo`", inline=False)
     embed.add_field(name="🔨 ADMIN - `Banir/Expulsar`", value="`!ban @user motivo`\n`!kick @user motivo`", inline=False)
     embed.add_field(name="ℹ️ GERAL", value="`!cmds` - Mostra este painel no PV", inline=False)
-
     try:
         await ctx.author.send(embed=embed)
         await ctx.send("📩 {} Te mandei a lista de comandos no PV!".format(ctx.author.mention), delete_after=3)
@@ -323,50 +352,38 @@ async def warn(ctx, member: discord.Member, *, motivo):
 @bot.command()
 @is_staff()
 async def addgogo(ctx, member: discord.Member):
-    """Adiciona alguém na gogo"""
     await ctx.send("✅ {} foi adicionado na gogo".format(member.mention))
     await enviar_log("ADDGOGO", member, ctx.author, "Adicionado na gogo", "logs-rp")
 
 @bot.command()
 @is_staff()
 async def listajogo(ctx):
-    """Lista quem está na gogo"""
     await ctx.send("📋 **Lista da Gogo:**\nNenhum player na lista ainda.")
 
+# COMANDOS DE PAINEL ARRUMADOS
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def painel(ctx):
-    ed = discord.Embed(
-        title="🏠 Painel Principal - PARADOXO RP",
-        description="Precisa de ajuda? Escolha uma opção abaixo:",
-        color=0x9B59B6
-    )
-    a = discord.ui.View()
-    a.add_item(discord.ui.Button(label="Suporte", emoji="🎫", style=discord.ButtonStyle.gray, custom_id="suporte"))
-    a.add_item(discord.ui.Button(label="Denunciar", emoji="🚨", style=discord.ButtonStyle.red, custom_id="denuncia"))
-    a.add_item(discord.ui.Button(label="Loja/VIP", emoji="💎", style=discord.ButtonStyle.green, custom_id="loja"))
-    await ctx.send(embed=ed, view=a)
-@commands.has_permissions(administrator=True)
-async def painelwhitelist(ctx):
-    embed = discord.Embed(title="📋 SISTEMA DE WHITELIST", description="Clique no botão abaixo para iniciar a whitelist com 15 perguntas", color=0x2ECC71)
-    view = discord.ui.View()
-    view.add_item(discord.ui.Button(label="Fazer Whitelist", emoji="📝", style=discord.ButtonStyle.green, custom_id="wl"))
-    await ctx.send(embed=embed, view=view)
-    
+    ed = discord.Embed(title="🏠 Painel Principal - PARADOXO RP", description="Precisa de ajuda? Escolha uma opção abaixo:", color=0x9B59B6)
+    view = TicketView()
+    await ctx.send(embed=ed, view=view)
+
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def painelloja(ctx):
-    ed = discord.Embed(
-        title="💎 LOJA PARADOXO RP",
-        description="Compre seus itens VIP abaixo:",
-        color=0xF1C40F
-    )
-    a = discord.ui.View()
-    a.add_item(discord.ui.Button(label="VIP Bronze", emoji="🥉", style=discord.ButtonStyle.secondary, custom_id="vipbronze"))
-    a.add_item(discord.ui.Button(label="VIP Prata", emoji="🥈", style=discord.ButtonStyle.secondary, custom_id="vipprata"))
-    a.add_item(discord.ui.Button(label="VIP Ouro", emoji="🥇", style=discord.ButtonStyle.success, custom_id="vipouro"))
-    await ctx.send(embed=ed, view=a)
-    
+    ed = discord.Embed(title="💎 LOJA PARADOXO RP", description="Compre seus itens VIP abaixo:", color=0xF1C40F)
+    view = LojaView()
+    await ctx.send(embed=ed, view=view)
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def painelwhitelist(ctx):
+    embed = discord.Embed(title="📋 SISTEMA DE WHITELIST", description="Clique no botão abaixo para iniciar a whitelist com 15 perguntas", color=0x2ECC71)
+    view = WhitelistView()
+    await ctx.send(embed=embed, view=view)
+
+@bot.command()
+@commands.has_permissions(administrator=True)
 async def painelinfo(ctx):
     canal = discord.utils.get(ctx.guild.channels, name="informacoes") or await ctx.guild.create_text_channel("informacoes")
     membros = ctx.guild.member_count
@@ -391,6 +408,53 @@ async def painelstaff(ctx):
     embed.add_field(name="Como funciona", value="1. Clique no botão\n2. Um ticket será aberto\n3. Aguarde um staff te atender", inline=False)
     await canal.send(embed=embed, view=StaffButton())
     await ctx.send("✅ Painel de staff criado em {}".format(canal.mention))
+
+# FUNÇÕES DE CRIAR TICKET SEPARADAS
+async def criar_ticket(interaction, tipo):
+    guild = interaction.guild
+    user = interaction.user
+    categoria = discord.utils.get(guild.categories, id=1528445353022455951) # CATEGORIA NORMAL
+
+    overwrites = {
+        guild.default_role: discord.PermissionOverwrite(view_channel=False),
+        user: discord.PermissionOverwrite(view_channel=True, send_messages=True),
+        guild.get_role(STAFF_ROLE_ID): discord.PermissionOverwrite(view_channel=True, send_messages=True)
+    }
+    nome = f"ticket-{tipo}-{user.name}"
+    canal = await guild.create_text_channel(name=nome, category=categoria, overwrites=overwrites)
+    await canal.send(f"{user.mention} <@&{STAFF_ROLE_ID}>\n**Ticket {tipo} aberto!** Descreva seu problema.")
+    await interaction.response.send_message(f"✅ Ticket criado: {canal.mention}", ephemeral=True)
+
+async def criar_ticket_vip(interaction, tipo):
+    guild = interaction.guild
+    user = interaction.user
+    categoria = discord.utils.get(guild.categories, id=1528506502791430144) # CATEGORIA LOJA
+
+    overwrites = {
+        guild.default_role: discord.PermissionOverwrite(view_channel=False),
+        user: discord.PermissionOverwrite(view_channel=True, send_messages=True),
+        guild.get_role(STAFF_ROLE_ID): discord.PermissionOverwrite(view_channel=True, send_messages=True)
+    }
+    nome = f"ticket-{tipo}-{user.name}"
+    canal = await guild.create_text_channel(name=nome, category=categoria, overwrites=overwrites)
+    await canal.send(f"{user.mention} <@&{STAFF_ROLE_ID}>\n**Ticket {tipo.upper()} aberto!** Qual método de pagamento?")
+    await interaction.response.send_message(f"✅ Ticket criado: {canal.mention}", ephemeral=True)
+
+async def criar_ticket_whitelist(interaction):
+    guild = interaction.guild
+    user = interaction.user
+    categoria = discord.utils.get(guild.categories, id=ID_WHITELIST) # TROCA AQUI PELO ID REAL
+
+    overwrites = {
+        guild.default_role: discord.PermissionOverwrite(view_channel=False),
+        user: discord.PermissionOverwrite(view_channel=True, send_messages=True),
+        guild.get_role(STAFF_ROLE_ID): discord.PermissionOverwrite(view_channel=True, send_messages=True)
+    }
+    nome = f"ticket-whitelist-{user.name}"
+    canal = await guild.create_text_channel(name=nome, category=categoria, overwrites=overwrites)
+    await canal.send(f"{user.mention} <@&{STAFF_ROLE_ID}>\n**Ticket Whitelist aberto!** Responda as perguntas.")
+    await interaction.response.send_message(f"✅ Ticket criado: {canal.mention}", ephemeral=True)
+
 @bot.event
 async def on_interaction(interaction):
     if interaction.type!= discord.InteractionType.component:
@@ -399,33 +463,12 @@ async def on_interaction(interaction):
     guild = interaction.guild
     user = interaction.user
     custom_id = interaction.data['custom_id']
-    STAFF_ROLE_ID = 152840954539960433 # Já tá no teu código linha 378
 
-    # WL
-    if custom_id == 'wl':
-        categoria = discord.utils.get(guild.categories, id=1528409546148544572)
-        nome = f"wl-{user.name}"
-        msg = f"{user.mention} <@&{STAFF_ROLE_ID}>\n**Bem-vindo a Whitelist!**\n\n**Pergunta 1/15:** {PERGUNTAS[0]}"
+    if custom_id in ["suporte", "denuncia", "loja"]:
+        await criar_ticket(interaction, custom_id)
+    elif custom_id in ["vipbronze", "vipprata", "vipouro"]:
+        await criar_ticket_vip(interaction, f"vip-{custom_id[3:]}")
+    elif custom_id == "whitelist":
+        await criar_ticket_whitelist(interaction)
 
-    # TICKET NORMAL
-    elif custom_id == "vipbronze":
-    await criar_ticket(interaction, "vip-bronze")
-elif custom_id == "vipprata":
-    await criar_ticket(interaction, "vip-prata")
-elif custom_id == "vipouro":
-    await criar_ticket(interaction, "vip-ouro")
-    else:
-        categoria = discord.utils.get(guild.categories, id=1528445353022455951)
-        nome = f"ticket-{custom_id}-{user.name}"
-        msg = f"{user.mention} <@&{STAFF_ROLE_ID}>\n**Ticket de {custom_id} aberto!** Explique seu caso."
-
-    overwrites = {
-        guild.default_role: discord.PermissionOverwrite(view_channel=False),
-        user: discord.PermissionOverwrite(view_channel=True, send_messages=True),
-        guild.get_role(STAFF_ROLE_ID): discord.PermissionOverwrite(view_channel=True, send_messages=True)
-    }
-
-    channel = await guild.create_text_channel(name=nome, category=categoria, overwrites=overwrites)
-    await channel.send(msg)
-    await interaction.response.send_message(f"✅ Ticket criado: {channel.mention}", ephemeral=True)
 bot.run(os.getenv("TOKEN"))
