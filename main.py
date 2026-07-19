@@ -334,22 +334,31 @@ async def listajogo(ctx):
     await ctx.send("📋 **Lista da Gogo:**\nNenhum player na lista ainda.")
 
 @bot.command()
+@bot.command()
 @commands.has_permissions(administrator=True)
 async def painel(ctx):
-    embed = discord.Embed(title="📊 PAINEIS DISPONIVEIS", color=0x3498db)
-    embed.add_field(name="Whitelist", value="`!painelwhitelist`", inline=False)
-    embed.add_field(name="Staff", value="`!painelstaff`", inline=False)
-    embed.add_field(name="Info", value="`!painelinfo`", inline=False)
-    embed.add_field(name="Anti-Sabotagem", value="`!painelanti`", inline=False)
-    await ctx.send(embed=embed)
+    embed = discord.Embed(
+        title="🏠 Painel Principal - PARADOXO RP",
+        description="Precisa de ajuda? Escolha uma opção abaixo:",
+        color=0x9B59B6
+    )
 
+    view = discord.ui.View()
+    view.add_item(discord.ui.Button(label="Suporte", emoji="🎫", style=discord.ButtonStyle.gray, custom_id="suporte"))
+    view.add_item(discord.ui.Button(label="Denunciar", emoji="🚨", style=discord.ButtonStyle.red, custom_id="denuncia"))
+    view.add_item(discord.ui.Button(label="Loja/VIP", emoji="💎", style=discord.ButtonStyle.green, custom_id="loja"))
+
+    await ctx.send(embed=embed, view=view)
+
+@bot.command()
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def painelwhitelist(ctx):
-    canal = discord.utils.get(ctx.guild.channels, name="whitelist") or await ctx.guild.create_text_channel("whitelist")
-    await canal.send(embed=discord.Embed(title="🎫 SISTEMA DE WHITELIST", description="Clique no botão abaixo para iniciar sua whitelist\n⚠️ Você só pode ter 1 ticket aberto por vez", color=0x00ff00), view=WhitelistButton())
-    await ctx.send("✅ Painel criado em {}".format(canal.mention))
-
+    embed = discord.Embed(title="📋 SISTEMA DE WHITELIST", description="Clique no botão abaixo para iniciar a whitelist com 15 perguntas", color=0x2ECC71)
+    view = discord.ui.View()
+    view.add_item(discord.ui.Button(label="Fazer Whitelist", emoji="📝", style=discord.ButtonStyle.green, custom_id="wl"))
+    await ctx.send(embed=embed, view=view)
+    
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def painelanti(ctx):
@@ -382,5 +391,35 @@ async def painelstaff(ctx):
     embed.add_field(name="Como funciona", value="1. Clique no botão\n2. Um ticket será aberto\n3. Aguarde um staff te atender", inline=False)
     await canal.send(embed=embed, view=StaffButton())
     await ctx.send("✅ Painel de staff criado em {}".format(canal.mention))
+@bot.event
+async def on_interaction(interaction):
+    if interaction.type!= discord.InteractionType.component:
+        return
 
+    guild = interaction.guild
+    user = interaction.user
+    custom_id = interaction.data['custom_id']
+    STAFF_ROLE_ID = 152840954539960433 # Já tá no teu código linha 378
+
+    # WL
+    if custom_id == 'wl':
+        categoria = discord.utils.get(guild.categories, id=1528409546148544572)
+        nome = f"wl-{user.name}"
+        msg = f"{user.mention} <@&{STAFF_ROLE_ID}>\n**Bem-vindo a Whitelist!**\n\n**Pergunta 1/15:** {PERGUNTAS[0]}"
+
+    # TICKET NORMAL
+    else:
+        categoria = discord.utils.get(guild.categories, id=1528445353022455951)
+        nome = f"ticket-{custom_id}-{user.name}"
+        msg = f"{user.mention} <@&{STAFF_ROLE_ID}>\n**Ticket de {custom_id} aberto!** Explique seu caso."
+
+    overwrites = {
+        guild.default_role: discord.PermissionOverwrite(view_channel=False),
+        user: discord.PermissionOverwrite(view_channel=True, send_messages=True),
+        guild.get_role(STAFF_ROLE_ID): discord.PermissionOverwrite(view_channel=True, send_messages=True)
+    }
+
+    channel = await guild.create_text_channel(name=nome, category=categoria, overwrites=overwrites)
+    await channel.send(msg)
+    await interaction.response.send_message(f"✅ Ticket criado: {channel.mention}", ephemeral=True)
 bot.run(os.getenv("TOKEN"))
