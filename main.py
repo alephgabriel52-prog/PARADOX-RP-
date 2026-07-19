@@ -20,8 +20,11 @@ intents.guilds = True
 intents.presences = True
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
-STAFF_ROLE_ID = 1528409545439969433 # CARGO EQUIPE STAFF
+STAFF_ROLE_ID = 1528409545439969433
 STAFF_MENTION = "<@&{}>".format(STAFF_ROLE_ID)
+CATEGORIA_NORMAL = 1528445353022455951
+CATEGORIA_LOJA = 1528506502791430144
+CATEGORIA_WHITELIST = ID_WHITELIST # TROCA AQUI
 
 ARQUIVO_WARNS = 'warns.json'
 ARQUIVO_TICKETS = 'tickets.json'
@@ -43,28 +46,6 @@ def is_staff():
         return any(role.id == STAFF_ROLE_ID for role in ctx.author.roles)
     return commands.check(predicate)
 
-async def criar_categoria_punicoes(guild):
-    category = discord.utils.get(guild.categories, name="PUNIÇÕES")
-    if not category:
-        category = await guild.create_category("PUNIÇÕES")
-    canais = ["logs", "logs-rp", "logs-ban", "logs-kick", "logs-warn", "logs-antisabotagem"]
-    for nome in canais:
-        if not discord.utils.get(guild.channels, name=nome):
-            overwrites = {guild.default_role: discord.PermissionOverwrite(view_channel=False), guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True)}
-            await guild.create_text_channel(nome, category=category, overwrites=overwrites)
-    return category
-
-async def enviar_log(tipo, user, staff, motivo, canal_nome):
-    canal = discord.utils.get(user.guild.channels, name=canal_nome)
-    if canal:
-        embed = discord.Embed(title="📝 LOG - {}".format(tipo), color=0xff0000, timestamp=discord.utils.utcnow())
-        embed.add_field(name="Jogador", value=user.mention, inline=True)
-        embed.add_field(name="Staff", value=staff.mention if staff else "SISTEMA", inline=True)
-        embed.add_field(name="Horário", value=datetime.now().strftime('%d/%m/%Y %H:%M'), inline=True)
-        embed.add_field(name="Motivo", value=motivo, inline=False)
-        await canal.send(embed=embed)
-
-respostas_ticket = {}
 PERGUNTAS = [
     "1. Qual seu nome completo e idade?",
     "2. Você já jogou RP antes? Em qual(is) cidade(s)?",
@@ -82,49 +63,60 @@ PERGUNTAS = [
     "14. Você tem microfone? Sabe fazer RP de voz?",
     "15. Por que devemos te aceitar na Cidade? Seja sincero." ]
 
+class TicketPainelView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+    async def get_ticket_owner(self, interaction):
+        for uid, cid in tickets_abertos.items():
+            if cid == interaction.channel.id:
+                return interaction.guild.get_member(int(uid))
+        return None
+    @discord.ui.button(label="Assumir Ticket", style=discord.ButtonStyle.primary, emoji="👮", custom_id="assumir_ticket")
+    async def assumir(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not any(role.id == STAFF_ROLE_ID for role in interaction.user.roles):
+            return await interaction.response.send_message("❌ Só a equipe {} pode assumir tickets!".format(STAFF_MENTION), ephemeral=True)
+        await interaction.channel.set_permissions(interaction.user, view_channel=True, send_messages=True)
+        await interaction.response.send_message("{} **assumiu este ticket!**".format(interaction.user.mention))
+    @discord.ui.button(label="Fechar Ticket", style=discord.ButtonStyle.danger, emoji="🔒", custom_id="fechar_ticket")
+    async def fechar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not any(role.id == STAFF_ROLE_ID for role in interaction.user.roles):
+            return await interaction.response.send_message("❌ Só a equipe {} pode fechar tickets!".format(STAFF_MENTION), ephemeral=True)
+        member = await self.get_ticket_owner(interaction)
+        await interaction.response.send_message("🔒 Fechando ticket em 3 segundos...")
+        await asyncio.sleep(3)
+        if member:
+            user_id = str(member.id)
+            if user_id in tickets_abertos:
+                del tickets_abertos[user_id]
+                salvar_tickets()
+            if user_id in respostas_ticket: del respostas_ticket[user_id]
+        await interaction.channel.delete()
+
+class TicketView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+    @discord.ui.button(label="Suporte", custom_id="suporte", style=discord.ButtonStyle.primary)
+    async def suporte(self, interaction, button): await criar_ticket(interaction, "suporte")
+    @discord.ui.button(label="Denuncia", custom_id="denuncia", style=discord.ButtonStyle.danger)
+    async def denuncia(self, interaction, button): await criar_ticket(interaction, "denuncia")
+    @discord.ui.button(label="Loja VIP", custom_id="loja", style=discord.ButtonStyle.success)
+    async def loja(self, interaction, button): await criar_ticket(interaction, "loja")
+
+class LojaView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+    @discord.ui.button(label="VIP Bronze", custom_id="vipbronze", style=discord.ButtonStyle.secondary)
+    async def bronze(self, interaction, button): await criar_ticket_vip(interaction, "vip-bronze")
+    @discord.ui.button(label="VIP Prata", custom_id="vipprata", style=discord.ButtonStyle.primary)
+    async def prata(self, interaction, button): await criar_ticket_vip(interaction, "vip-prata")
+    @discord.ui.button(label="VIP Ouro", custom_id="vipouro", style=discord.ButtonStyle.success)
+    async def ouro(self, interaction, button): await criar_ticket_vip(interaction, "vip-ouro")
 
 class WhitelistButton(discord.ui.View):
     def __init__(self): super().__init__(timeout=None)
     @discord.ui.button(label="Fazer Whitelist", style=discord.ButtonStyle.green, emoji="✅", custom_id="btn_whitelist_001")
     async def whitelist(self, interaction: discord.Interaction, button: discord.ui.Button):
-        user_id = str(interaction.user.id)
-        if user_id in tickets_abertos:
-            canal_ticket = interaction.guild.get_channel(tickets_abertos[user_id])
-            if canal_ticket:
-                return await interaction.response.send_message("❌ Você já tem um ticket aberto: {}".format(canal_ticket.mention), ephemeral=True)
-            else:
-                del tickets_abertos[user_id]
-                salvar_tickets()
-        category = discord.utils.get(interaction.guild.categories, name="WHITELIST") or await interaction.guild.create_category("WHITELIST")
-        overwrites = {
-            interaction.guild.default_role: discord.PermissionOverwrite(view_channel=False),
-            interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True),
-            interaction.guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True)
-        }
-        channel = await interaction.guild.create_text_channel("whitelist-{}".format(interaction.user.name), category=category, overwrites=overwrites)
-        tickets_abertos[user_id] = channel.id
-        salvar_tickets()
-        respostas_ticket[user_id] = []
-        await channel.send("{} Bem-vindo a whitelist! Responda a pergunta 1:\n\n**{}**".format(interaction.user.mention, PERGUNTAS[0]), view=TicketCloseView())
-        await interaction.response.send_message("✅ Ticket criado: {}".format(channel.mention), ephemeral=True)
-
-class StaffButton(discord.ui.View):
-    def __init__(self): super().__init__(timeout=None)
-    @discord.ui.button(label="Chamar Staff", style=discord.ButtonStyle.red, emoji="🚨", custom_id="btn_chamar_staff")
-    async def chamar_staff(self, interaction: discord.Interaction, button: discord.ui.Button):
-        user_id = str(interaction.user.id)
-        if user_id in tickets_abertos:
-            canal_ticket = interaction.guild.get_channel(tickets_abertos[user_id])
-            return await interaction.response.send_message("❌ Já tem chamado aberto: {}".format(canal_ticket.mention), ephemeral=True)
-        category = discord.utils.get(interaction.guild.categories, name="ATENDIMENTO") or await interaction.guild.create_category("ATENDIMENTO")
-        role_staff = interaction.guild.get_role(STAFF_ROLE_ID)
-        overwrites = {interaction.guild.default_role: discord.PermissionOverwrite(view_channel=False), interaction.user: discord.PermissionOverwrite(view_channel=True), interaction.guild.me: discord.PermissionOverwrite(view_channel=True)}
-        if role_staff: overwrites[role_staff] = discord.PermissionOverwrite(view_channel=True)
-        channel = await interaction.guild.create_text_channel("atendimento-{}".format(interaction.user.name), category=category, overwrites=overwrites)
-        tickets_abertos[user_id] = channel.id
-        salvar_tickets()
-        await channel.send("{} {}".format(STAFF_MENTION, interaction.user.mention) + " abriu um chamado!")
-        await interaction.response.send_message("✅ Atendimento aberto: {}".format(channel.mention), ephemeral=True)
+        await criar_ticket_whitelist(interaction)
 
 class TicketCloseView(discord.ui.View):
     def __init__(self): super().__init__(timeout=None)
@@ -156,9 +148,10 @@ class MotivoModal(discord.ui.Modal):
         self.add_item(self.motivo)
     async def on_submit(self, interaction: discord.Interaction):
         user_id = str(self.member.id)
+        channel = interaction.channel
+        category = channel.category
         if self.tipo == "aprovado":
-            dm_embed = discord.Embed(title="✅ WHITELIST APROVADA - PARADOX RP", description="Olá {}, sua whitelist foi **APROVADA**!\n\n**Motivo:** {}\n\nBem-vindo ao servidor! Leia as regras e bom RP.".format(self.member.name, self.motivo.value), color=0x00ff00)
-            if interaction.guild.icon: dm_embed.set_thumbnail(url=interaction.guild.icon.url)
+            dm_embed = discord.Embed(title="✅ WHITELIST APROVADA - PARADOX RP", description="Olá {}, sua whitelist foi **APROVADA**!\n\n**Motivo:** {}\n\nBem-vindo ao servidor!".format(self.member.name, self.motivo.value), color=0x00ff00)
             role = discord.utils.get(interaction.guild.roles, name="Membro")
             if role: await self.member.add_roles(role)
             if user_id in respostas_ticket and len(respostas_ticket[user_id]) >= 15:
@@ -166,101 +159,105 @@ class MotivoModal(discord.ui.Modal):
                 try: await self.member.edit(nick=nick[:32])
                 except: pass
             await enviar_log("WHITELIST APROVADA", self.member, interaction.user, self.motivo.value, "logs-rp")
-            await interaction.response.send_message("✅ {} aprovado! Apagando ticket em 3s...".format(self.member.mention), ephemeral=True)
+            await interaction.response.send_message("✅ {} aprovado!".format(self.member.mention), ephemeral=True)
         else:
-            dm_embed = discord.Embed(title="❌ WHITELIST REPROVADA - PARADOX RP", description="Olá {}, infelizmente sua whitelist foi **REPROVADA**.\n\n**Motivo:** {}\n\nVocê pode abrir outro ticket após corrigir o motivo acima.".format(self.member.name, self.motivo.value), color=0xff0000)
-            if interaction.guild.icon: dm_embed.set_thumbnail(url=interaction.guild.icon.url)
+            dm_embed = discord.Embed(title="❌ WHITELIST REPROVADA - PARADOX RP", description="Olá {}, sua whitelist foi **REPROVADA**.\n\n**Motivo:** {}".format(self.member.name, self.motivo.value), color=0xff0000)
             await enviar_log("WHITELIST REPROVADA", self.member, interaction.user, self.motivo.value, "logs-rp")
-            await interaction.response.send_message("❌ {} reprovado! Apagando ticket em 3s...".format(self.member.mention), ephemeral=True)
-        try:
-            await self.member.send(embed=dm_embed)
-        except discord.Forbidden:
-            await interaction.followup.send("⚠️ Não consegui mandar DM para {}. DM fechada.".format(self.member.mention), ephemeral=True)
-        except Exception as e:
-            print("Erro ao enviar DM: {}".format(e))
+            await interaction.response.send_message("❌ {} reprovado!".format(self.member.mention), ephemeral=True)
+        try: await self.member.send(embed=dm_embed)
+        except: pass
         await asyncio.sleep(3)
         if user_id in tickets_abertos:
             del tickets_abertos[user_id]
             salvar_tickets()
         if user_id in respostas_ticket: del respostas_ticket[user_id]
-        await interaction.channel.delete()
+        await channel.delete()
+        if category and category.name == "WHITELIST":
+            if len(category.channels) == 0:
+                await category.delete()
 
-# VIEWS NOVAS PRA LOJA E PAINEL
-class TicketView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-    @discord.ui.button(label="Suporte", custom_id="suporte", style=discord.ButtonStyle.primary)
-    async def suporte(self, interaction, button): await criar_ticket(interaction, "suporte")
-    @discord.ui.button(label="Denuncia", custom_id="denuncia", style=discord.ButtonStyle.danger)
-    async def denuncia(self, interaction, button): await criar_ticket(interaction, "denuncia")
-    @discord.ui.button(label="Loja VIP", custom_id="loja", style=discord.ButtonStyle.success)
-    async def loja(self, interaction, button): await criar_ticket(interaction, "loja")
+async def enviar_log(tipo, user, staff, motivo, canal_nome):
+    canal = discord.utils.get(user.guild.channels, name=canal_nome)
+    if canal:
+        embed = discord.Embed(title="📝 LOG - {}".format(tipo), color=0xff0000, timestamp=discord.utils.utcnow())
+        embed.add_field(name="Jogador", value=user.mention, inline=True)
+        embed.add_field(name="Staff", value=staff.mention if staff else "SISTEMA", inline=True)
+        embed.add_field(name="Motivo", value=motivo, inline=False)
+        await canal.send(embed=embed)
 
-class LojaView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-    @discord.ui.button(label="VIP Bronze", custom_id="vipbronze", style=discord.ButtonStyle.secondary)
-    async def bronze(self, interaction, button): await criar_ticket_vip(interaction, "vip-bronze")
-    @discord.ui.button(label="VIP Prata", custom_id="vipprata", style=discord.ButtonStyle.primary)
-    async def prata(self, interaction, button): await criar_ticket_vip(interaction, "vip-prata")
-    @discord.ui.button(label="VIP Ouro", custom_id="vipouro", style=discord.ButtonStyle.success)
-    async def ouro(self, interaction, button): await criar_ticket_vip(interaction, "vip-ouro")
-
-class WhitelistView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-    @discord.ui.button(label="Solicitar Whitelist", custom_id="whitelist", style=discord.ButtonStyle.success)
-    async def whitelist(self, interaction, button): await criar_ticket_whitelist(interaction)
-
-@bot.event
-async def on_message_delete(message):
-    if message.author.bot: return
-    canal_log = discord.utils.get(message.guild.channels, name="logs")
-    if canal_log:
-        embed = discord.Embed(title="🗑️ MENSAGEM APAGADA", color=0xffa500, timestamp=discord.utils.utcnow())
-        embed.add_field(name="Autor", value=message.author.mention, inline=True)
-        embed.add_field(name="Canal", value=message.channel.mention, inline=True)
-        embed.add_field(name="Conteúdo", value=message.content[:1024] if message.content else "*Embed/Anexo*", inline=False)
-        await canal_log.send(embed=embed)
-
-@bot.event
-async def on_guild_channel_delete(channel):
-    for user_id, channel_id in list(tickets_abertos.items()):
-        if channel_id == channel.id:
+# FUNÇÃO GLOBAL PRA VERIFICAR SE JÁ TEM TICKET
+async def ja_tem_ticket(guild, user, interaction):
+    user_id = str(user.id)
+    if user_id in tickets_abertos:
+        canal_ticket = guild.get_channel(tickets_abertos[user_id])
+        if canal_ticket:
+            await interaction.response.send_message("❌ Você já tem um ticket aberto: {}".format(canal_ticket.mention), ephemeral=True)
+            return True
+        else:
             del tickets_abertos[user_id]
             salvar_tickets()
-            if user_id in respostas_ticket: del respostas_ticket[user_id]
-            break
-    await asyncio.sleep(1)
-    async for entry in channel.guild.audit_logs(limit=1, action=discord.AuditLogAction.channel_delete):
-        if entry.user and not entry.user.bot:
-            await punir_sabotador(entry.user, "Apagou o canal: {}".format(channel.name), channel.guild)
+    return False
 
-@bot.event
-async def on_guild_role_delete(role):
-    await asyncio.sleep(1)
-    async for entry in role.guild.audit_logs(limit=1, action=discord.AuditLogAction.role_delete):
-        if entry.user and not entry.user.bot:
-            await punir_sabotador(entry.user, "Apagou o cargo: {}".format(role.name), role.guild)
+async def criar_ticket(interaction, tipo):
+    guild = interaction.guild
+    user = interaction.user
+    if await ja_tem_ticket(guild, user, interaction): return
+    categoria = discord.utils.get(guild.categories, id=CATEGORIA_NORMAL)
+    overwrites = {
+        guild.default_role: discord.PermissionOverwrite(view_channel=False),
+        user: discord.PermissionOverwrite(view_channel=True, send_messages=True),
+        guild.get_role(STAFF_ROLE_ID): discord.PermissionOverwrite(view_channel=True, send_messages=True)
+    }
+    nome = f"ticket-{tipo}-{user.name}"
+    canal = await guild.create_text_channel(name=nome, category=categoria, overwrites=overwrites)
+    tickets_abertos[str(user.id)] = canal.id
+    salvar_tickets()
+    await canal.send(f"{user.mention} <@&{STAFF_ROLE_ID}>\n**Ticket {tipo} aberto!**", view=TicketPainelView())
+    await interaction.response.send_message(f"✅ Ticket criado: {canal.mention}", ephemeral=True)
 
-async def punir_sabotador(member, motivo, guild):
-    try:
-        await member.edit(roles=[])
-        try: await member.send("🚨 Tá pensando que aqui é bagunça")
-        except: pass
-        await enviar_log("ANTI-SABOTAGEM", member, guild.me, motivo, "logs-antisabotagem")
-    except Exception as e:
-        print("Erro ao punir: {}".format(e))
+async def criar_ticket_vip(interaction, tipo):
+    guild = interaction.guild
+    user = interaction.user
+    if await ja_tem_ticket(guild, user, interaction): return
+    categoria = discord.utils.get(guild.categories, id=CATEGORIA_LOJA)
+    overwrites = {
+        guild.default_role: discord.PermissionOverwrite(view_channel=False),
+        user: discord.PermissionOverwrite(view_channel=True, send_messages=True),
+        guild.get_role(STAFF_ROLE_ID): discord.PermissionOverwrite(view_channel=True, send_messages=True)
+    }
+    nome = f"ticket-{tipo}-{user.name}"
+    canal = await guild.create_text_channel(name=nome, category=categoria, overwrites=overwrites)
+    tickets_abertos[str(user.id)] = canal.id
+    salvar_tickets()
+    await canal.send(f"{user.mention} <@&{STAFF_ROLE_ID}>\n**Ticket {tipo.upper()} aberto!**", view=TicketPainelView())
+    await interaction.response.send_message(f"✅ Ticket criado: {canal.mention}", ephemeral=True)
+
+async def criar_ticket_whitelist(interaction):
+    guild = interaction.guild
+    user = interaction.user
+    if await ja_tem_ticket(guild, user, interaction): return
+    categoria = discord.utils.get(guild.categories, id=CATEGORIA_WHITELIST)
+    if not categoria: categoria = await guild.create_category("WHITELIST")
+    overwrites = {
+        guild.default_role: discord.PermissionOverwrite(view_channel=False),
+        user: discord.PermissionOverwrite(view_channel=True, send_messages=True),
+        guild.get_role(STAFF_ROLE_ID): discord.PermissionOverwrite(view_channel=True, send_messages=True)
+    }
+    canal = await guild.create_text_channel("whitelist-{}".format(user.name), category=categoria, overwrites=overwrites)
+    tickets_abertos[str(user.id)] = canal.id
+    salvar_tickets()
+    respostas_ticket[str(user.id)] = []
+    await canal.send("{} Bem-vindo a whitelist! **{}**".format(user.mention, PERGUNTAS[0]), view=TicketCloseView())
+    await interaction.response.send_message("✅ Ticket criado: {}".format(canal.mention), ephemeral=True)
 
 @bot.event
 async def on_ready():
     print('{} Online'.format(bot.user))
-    bot.add_view(WhitelistButton())
-    bot.add_view(TicketCloseView())
-    bot.add_view(StaffButton())
+    bot.add_view(TicketPainelView())
     bot.add_view(TicketView())
     bot.add_view(LojaView())
-    bot.add_view(WhitelistView())
+    bot.add_view(WhitelistButton())
+    bot.add_view(TicketCloseView())
 
 @bot.event
 async def on_message(message):
@@ -274,201 +271,22 @@ async def on_message(message):
                 if num < len(PERGUNTAS):
                     await message.channel.send("✅ Anotado! Pergunta {}: **{}**".format(num + 1, PERGUNTAS[num]))
                 else:
-                    await message.channel.send("✅ Todas as 15 perguntas respondidas! Aguarde um membro da {} para Aprovar/Reprovar.".format(STAFF_MENTION))
+                    await message.channel.send("✅ Todas as 15 perguntas respondidas! Aguarde a {} aprovar.".format(STAFF_MENTION))
     await bot.process_commands(message)
 
-@bot.event
-async def on_command_error(ctx, error):
-    if isinstance(error, commands.CheckFailure):
-        await ctx.send("❌ Você não tem permissão. Precisa ser da equipe staff.", delete_after=5)
-    elif isinstance(error, commands.CommandNotFound):
-        await ctx.send("❌ Comando `!{}` não existe. Use `!cmds`".format(ctx.invoked_with), delete_after=5)
-
-@bot.command()
-async def cmds(ctx):
-    embed = discord.Embed(title="📜 PAINEL DE COMANDOS - PARADOX RP", color=0x3498db)
-    embed.add_field(name="🎫 PAINÉIS - `Administrador`", value="`!painel`\n`!painelloja`\n`!painelwhitelist`\n`!painelstaff`\n`!painelinfo`", inline=False)
-    embed.add_field(name="👮 EQUIPE STAFF - Cargo {}".format(STAFF_MENTION), value="`!algemar @user`\n`!warn @user motivo`\n`!buscar @user`\n`!addgogo @user`\n`!listajogo`", inline=False)
-    embed.add_field(name="🔨 ADMIN - `Banir/Expulsar`", value="`!ban @user motivo`\n`!kick @user motivo`", inline=False)
-    embed.add_field(name="ℹ️ GERAL", value="`!cmds` - Mostra este painel no PV", inline=False)
-    try:
-        await ctx.author.send(embed=embed)
-        await ctx.send("📩 {} Te mandei a lista de comandos no PV!".format(ctx.author.mention), delete_after=3)
-    except discord.Forbidden:
-        await ctx.send("❌ {} Não consegui te mandar PV. Abre sua DM pra eu conseguir enviar.".format(ctx.author.mention))
-
-@bot.command()
-@is_staff()
-async def buscar(ctx, member: discord.Member):
-    user_id = str(member.id)
-    total_warns = len(warns.get(user_id, []))
-    embed = discord.Embed(title="🔍 FICHA DE {}".format(member.name.upper()), color=0x2ecc71)
-    embed.add_field(name="ID", value=member.id, inline=True)
-    embed.add_field(name="Entrou em", value=member.joined_at.strftime('%d/%m/%Y'), inline=True)
-    embed.add_field(name="Warns", value="**{}/3**".format(total_warns), inline=True)
-    if total_warns > 0:
-        embed.add_field(name="Motivos", value="\n".join(warns[user_id]), inline=False)
-    await ctx.send(embed=embed)
-
-@bot.command()
-@is_staff()
-async def algemar(ctx, member: discord.Member):
-    role_algema = discord.utils.get(ctx.guild.roles, name="Algemado")
-    if not role_algema: role_algema = await ctx.guild.create_role(name="Algemado", color=0x808080)
-    if role_algema in member.roles:
-        await member.remove_roles(role_algema)
-        await ctx.send("🔓 {} foi **desalgemado**".format(member.mention))
-        await enviar_log("DESALGEMAR", member, ctx.author, "Liberado", "logs-rp")
-    else:
-        await member.add_roles(role_algema)
-        await ctx.send("⛓️ {} foi **algemado**".format(member.mention))
-        await enviar_log("ALGEMAR", member, ctx.author, "Algemado para abordagem RP", "logs-rp")
-
-@bot.command()
-@commands.has_permissions(ban_members=True)
-async def ban(ctx, member: discord.Member, *, reason="Sem motivo"):
-    await member.ban(reason=reason)
-    await enviar_log("BAN", member, ctx.author, reason, "logs-ban")
-    await ctx.send("🔨 {} foi banido.\nMotivo: {}".format(member.mention, reason))
-
-@bot.command()
-@commands.has_permissions(kick_members=True)
-async def kick(ctx, member: discord.Member, *, reason="Sem motivo"):
-    await member.kick(reason=reason)
-    await enviar_log("KICK", member, ctx.author, reason, "logs-kick")
-    await ctx.send("👢 {} foi expulso.\nMotivo: {}".format(member.mention, reason))
-
-@bot.command()
-@is_staff()
-async def warn(ctx, member: discord.Member, *, motivo):
-    user_id = str(member.id)
-    if user_id not in warns: warns[user_id] = []
-    warns[user_id].append(motivo)
-    salvar_warns()
-    total = len(warns[user_id])
-    await enviar_log("WARN", member, ctx.author, "{} | Total: {}/3".format(motivo, total), "logs-warn")
-    await ctx.send("⚠️ {} recebeu warn. Total: **{}/3**".format(member.mention, total))
-
-@bot.command()
-@is_staff()
-async def addgogo(ctx, member: discord.Member):
-    await ctx.send("✅ {} foi adicionado na gogo".format(member.mention))
-    await enviar_log("ADDGOGO", member, ctx.author, "Adicionado na gogo", "logs-rp")
-
-@bot.command()
-@is_staff()
-async def listajogo(ctx):
-    await ctx.send("📋 **Lista da Gogo:**\nNenhum player na lista ainda.")
-
-# COMANDOS DE PAINEL ARRUMADOS
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def painel(ctx):
-    ed = discord.Embed(title="🏠 Painel Principal - PARADOXO RP", description="Precisa de ajuda? Escolha uma opção abaixo:", color=0x9B59B6)
-    view = TicketView()
-    await ctx.send(embed=ed, view=view)
+    await ctx.send(embed=discord.Embed(title="🏠 Painel Principal", description="Escolha uma opção:", color=0x9B59B6), view=TicketView())
 
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def painelloja(ctx):
-    ed = discord.Embed(title="💎 LOJA PARADOXO RP", description="Compre seus itens VIP abaixo:", color=0xF1C40F)
-    view = LojaView()
-    await ctx.send(embed=ed, view=view)
+    await ctx.send(embed=discord.Embed(title="💎 LOJA PARADOXO RP", description="VIP abaixo:", color=0xF1C40F), view=LojaView())
 
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def painelwhitelist(ctx):
-    embed = discord.Embed(title="📋 SISTEMA DE WHITELIST", description="Clique no botão abaixo para iniciar a whitelist com 15 perguntas", color=0x2ECC71)
-    view = WhitelistView()
-    await ctx.send(embed=embed, view=view)
-
-@bot.command()
-@commands.has_permissions(administrator=True)
-async def painelinfo(ctx):
-    canal = discord.utils.get(ctx.guild.channels, name="informacoes") or await ctx.guild.create_text_channel("informacoes")
-    membros = ctx.guild.member_count
-    embed = discord.Embed(title="📢 INFORMAÇÕES DO SERVIDOR", color=0x3498db, timestamp=discord.utils.utcnow())
-    embed.add_field(name="👑 Dono", value=ctx.guild.owner.mention, inline=True)
-    embed.add_field(name="👥 Membros", value="{}".format(membros), inline=True)
-    embed.add_field(name="📅 Criado em", value=ctx.guild.created_at.strftime('%d/%m/%Y'), inline=True)
-    embed.add_field(name="🌐 IP do Servidor", value="`ip.aqui.com:30120`", inline=False)
-    embed.add_field(name="⏰ Horário RP", value="Seg - Dom: 14h às 00h", inline=False)
-    await canal.send(embed=embed)
-    await ctx.send("✅ Painel de informações criado em {}".format(canal.mention))
-
-@bot.command()
-@commands.has_permissions(administrator=True)
-async def painelstaff(ctx):
-    canal = discord.utils.get(ctx.guild.channels, name="staff") or await ctx.guild.create_text_channel("staff")
-    role_staff = ctx.guild.get_role(STAFF_ROLE_ID)
-    staff_online = len([m for m in ctx.guild.members if m.status!= discord.Status.offline and role_staff in m.roles]) if role_staff else 0
-    desc = "Precisa de ajuda? Clique no botão abaixo\nStaff: " + STAFF_MENTION
-    embed = discord.Embed(title="👮 EQUIPE DE STAFF", description=desc, color=0xe74c3c)
-    embed.add_field(name="Staff Online", value="**{}** online agora".format(staff_online), inline=False)
-    embed.add_field(name="Como funciona", value="1. Clique no botão\n2. Um ticket será aberto\n3. Aguarde um staff te atender", inline=False)
-    await canal.send(embed=embed, view=StaffButton())
-    await ctx.send("✅ Painel de staff criado em {}".format(canal.mention))
-
-# FUNÇÕES DE CRIAR TICKET SEPARADAS
-async def criar_ticket(interaction, tipo):
-    guild = interaction.guild
-    user = interaction.user
-    categoria = discord.utils.get(guild.categories, id=1528445353022455951) # CATEGORIA NORMAL
-
-    overwrites = {
-        guild.default_role: discord.PermissionOverwrite(view_channel=False),
-        user: discord.PermissionOverwrite(view_channel=True, send_messages=True),
-        guild.get_role(STAFF_ROLE_ID): discord.PermissionOverwrite(view_channel=True, send_messages=True)
-    }
-    nome = f"ticket-{tipo}-{user.name}"
-    canal = await guild.create_text_channel(name=nome, category=categoria, overwrites=overwrites)
-    await canal.send(f"{user.mention} <@&{STAFF_ROLE_ID}>\n**Ticket {tipo} aberto!** Descreva seu problema.")
-    await interaction.response.send_message(f"✅ Ticket criado: {canal.mention}", ephemeral=True)
-
-async def criar_ticket_vip(interaction, tipo):
-    guild = interaction.guild
-    user = interaction.user
-    categoria = discord.utils.get(guild.categories, id=1528506502791430144) # CATEGORIA LOJA
-
-    overwrites = {
-        guild.default_role: discord.PermissionOverwrite(view_channel=False),
-        user: discord.PermissionOverwrite(view_channel=True, send_messages=True),
-        guild.get_role(STAFF_ROLE_ID): discord.PermissionOverwrite(view_channel=True, send_messages=True)
-    }
-    nome = f"ticket-{tipo}-{user.name}"
-    canal = await guild.create_text_channel(name=nome, category=categoria, overwrites=overwrites)
-    await canal.send(f"{user.mention} <@&{STAFF_ROLE_ID}>\n**Ticket {tipo.upper()} aberto!** Qual método de pagamento?")
-    await interaction.response.send_message(f"✅ Ticket criado: {canal.mention}", ephemeral=True)
-
-async def criar_ticket_whitelist(interaction):
-    guild = interaction.guild
-    user = interaction.user
-    categoria = discord.utils.get(guild.categories, id=ID_WHITELIST) # TROCA AQUI PELO ID REAL
-
-    overwrites = {
-        guild.default_role: discord.PermissionOverwrite(view_channel=False),
-        user: discord.PermissionOverwrite(view_channel=True, send_messages=True),
-        guild.get_role(STAFF_ROLE_ID): discord.PermissionOverwrite(view_channel=True, send_messages=True)
-    }
-    nome = f"ticket-whitelist-{user.name}"
-    canal = await guild.create_text_channel(name=nome, category=categoria, overwrites=overwrites)
-    await canal.send(f"{user.mention} <@&{STAFF_ROLE_ID}>\n**Ticket Whitelist aberto!** Responda as perguntas.")
-    await interaction.response.send_message(f"✅ Ticket criado: {canal.mention}", ephemeral=True)
-
-@bot.event
-async def on_interaction(interaction):
-    if interaction.type!= discord.InteractionType.component:
-        return
-
-    guild = interaction.guild
-    user = interaction.user
-    custom_id = interaction.data['custom_id']
-
-    if custom_id in ["suporte", "denuncia", "loja"]:
-        await criar_ticket(interaction, custom_id)
-    elif custom_id in ["vipbronze", "vipprata", "vipouro"]:
-        await criar_ticket_vip(interaction, f"vip-{custom_id[3:]}")
-    elif custom_id == "whitelist":
-        await criar_ticket_whitelist(interaction)
+    await ctx.send(embed=discord.Embed(title="📋 SISTEMA DE WHITELIST", description="15 perguntas", color=0x2ECC71), view=WhitelistButton())
 
 bot.run(os.getenv("TOKEN"))
