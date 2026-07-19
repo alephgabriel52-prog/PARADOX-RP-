@@ -72,23 +72,23 @@ def is_staff():
         return False
     return commands.check(predicate)
 
-# ===== ANTI-ROUBO CORRIGIDO =====
+# ===== ANTI-ROUBO CORRIGIDO COM FETCH =====
 @bot.event
 async def on_guild_join(guild):
-    # VERIFICA SE VOCÊ TÁ NO SERVIDOR
-    dono = guild.get_member(DONO_ID)
+    await asyncio.sleep(2) # espera carregar
+    try:
+        dono = await guild.fetch_member(DONO_ID) # BUSCA NA API
+    except:
+        dono = None
 
     if not dono:
-        # VOCÊ NÃO TÁ LÁ = VAZA
         msg_saida = "🚨 **VOCÊ NÃO É O BIEL**\nSó entro em servidor que o Biel ID: 1438010935783460954 estiver.\nBot saindo em 3s..."
-
         for canal in guild.text_channels:
             try:
                 if canal.permissions_for(guild.me).send_messages:
                     await canal.send(msg_saida)
                     break
             except: pass
-
         await asyncio.sleep(3)
         await guild.leave()
         print(f"SAÍ: {guild.name} - Biel não estava no servidor")
@@ -98,9 +98,12 @@ async def on_guild_join(guild):
 @bot.event
 async def on_ready():
     print(f"Bot online como {bot.user}")
-    # CHECA TODOS SERVIDORES AO INICIAR
+    await asyncio.sleep(5) # espera carregar tudo
     for guild in bot.guilds:
-        dono = guild.get_member(DONO_ID)
+        try:
+            dono = await guild.fetch_member(DONO_ID)
+        except:
+            dono = None
         if not dono:
             print(f"SAINDO: {guild.name} - Biel não está aqui")
             await guild.leave()
