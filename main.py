@@ -72,7 +72,7 @@ def is_staff():
         return False
     return commands.check(predicate)
 
-# ===== ANTI-ROUBO NIVEL HARD =====
+# ===== ANTI-ROUBO CORRIGIDO =====
 @bot.event
 async def on_guild_join(guild):
     # VERIFICA SE VOCÊ TÁ NO SERVIDOR
@@ -80,13 +80,15 @@ async def on_guild_join(guild):
 
     if not dono:
         # VOCÊ NÃO TÁ LÁ = VAZA
-        try:
-            await guild.owner.send("😡 **AQUI NÃO VACILÃO**\nSó entro em servidor que o Biel ID: 1438010935783460954 estiver.\nSaindo em 3s...")
-        except: pass
+        msg_saida = "🚨 **VOCÊ NÃO É O BIEL**\nSó entro em servidor que o Biel ID: 1438010935783460954 estiver.\nBot saindo em 3s..."
 
         for canal in guild.text_channels:
-            if canal.permissions_for(guild.me).send_messages:
-                await canal.send("🚨 **VOCÊ NÃO É O BIEL**\nBot saindo..."); break
+            try:
+                if canal.permissions_for(guild.me).send_messages:
+                    await canal.send(msg_saida)
+                    break
+            except: pass
+
         await asyncio.sleep(3)
         await guild.leave()
         print(f"SAÍ: {guild.name} - Biel não estava no servidor")
@@ -205,7 +207,7 @@ async def cmds(ctx):
     embed.add_field(name="👑 SÓ O DONO PODE", value="`!setup`", inline=False)
     embed.add_field(name="👮 STAFF PODE USAR", value="`!contratar` `!demitir` `!transferir` `!promover` `!rebaixar`\n`!warn` `!kick` `!ban` `!mutar` `!limpar`\n`!advertencia` `!escala` `!reuniao`", inline=False)
     embed.add_field(name="😄 TODOS PODEM", value="`!ping` `!avatar` `!infouser` `!cmds`", inline=False)
-    embed.set_footer(text="Trava: Só fica no serv se o biel040066 estiver 😈")
+    embed.set_footer(text="Trava: Só fica no serv se o Biel estiver 😈")
     await ctx.author.send(embed=embed); await ctx.send("✅ Mandei a lista no seu PV!")
 
 bot.run(os.getenv("TOKEN"))
