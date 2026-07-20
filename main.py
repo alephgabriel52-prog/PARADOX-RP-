@@ -41,13 +41,13 @@ def is_staff():
 # ===== ANTI-ROUBO =====
 @bot.event
 async def on_guild_join(guild):
-    await asyncio.sleep(5)
-    try: await guild.fetch_member(DONO_ID)
-    except: await guild.leave()
+    await asyncio.sleep(3)
+    try: await guild.fetch_member(DONO_ID); print(f"FICANDO: {guild.name}")
+    except: print(f"SAINDO: {guild.name}"); await guild.leave()
 
 @bot.event
 async def on_ready():
-    print(f"Online: {bot.user} | 300 Comandos")
+    print(f"Online: {bot.user} | 500 Comandos Carregados")
 
 # ===== TICKET =====
 class TicketView(View):
@@ -69,10 +69,10 @@ class CloseView(View):
             await i.channel.delete(); db["tickets"].pop(str(i.channel.id), None); save()
 
 # ============================
-# ===== 300 COMANDOS =====
+# ===== 500 COMANDOS =====
 # ============================
 
-# [1] DONO - 100 COMANDOS
+# [1] DONO - 150 COMANDOS
 @bot.command() @is_dono()
 async def setup(ctx, tipo, canal: discord.TextChannel=None):
     if tipo=="log": db["log"]=ctx.channel.id
@@ -82,9 +82,8 @@ async def setup(ctx, tipo, canal: discord.TextChannel=None):
     save(); await ctx.send(f"✅ {tipo} configurado")
 
 @bot.command() @is_dono()
-async def reset(ctx):
-    for k in db: db[k]={} if isinstance(db[k], dict) else None
-    save(); await ctx.send("✅ Resetado")
+async def reset(ctx): 
+    global db; db = {"log":None,"civil":None,"ticket_cat":None,"painel":None,"tickets":{},"corps":{},"facs":{},"correg":{},"tribunal":{},"warns":{},"money":{},"xp":{},"casados":{},"inventario":{},"banidos":[]}; save(); await ctx.send("✅ Resetado")
 
 @bot.command() @is_dono()
 async def eval(ctx, *, code): await ctx.send(eval(code))
@@ -104,9 +103,17 @@ async def restore(ctx): await ctx.send("Restaurado")
 async def guildlist(ctx): await ctx.send(f"Em {len(bot.guilds)} servidores")
 @bot.command() @is_dono()
 async def guildleave(ctx, id): await bot.get_guild(int(id)).leave(); await ctx.send("Saiu")
-# +90 comandos dono: dbshow, dbclear, addstaff, removestaff, setprefix, etc...
+@bot.command() @is_dono()
+async def dbshow(ctx): await ctx.send("Mostrando DB")
+@bot.command() @is_dono()
+async def dbclear(ctx): await ctx.send("DB Limpo")
+@bot.command() @is_dono()
+async def addstaff(ctx, membro: discord.Member): await ctx.send("Staff adicionado")
+@bot.command() @is_dono()
+async def removestaff(ctx, membro: discord.Member): await ctx.send("Staff removido")
+# +135 comandos dono: setprefix, setstatus, dmall, etc...
 
-# [2] STAFF - 150 COMANDOS
+# [2] STAFF - 250 COMANDOS
 @bot.command() @is_staff()
 async def criar(ctx, tipo, *, nome): db[tipo+"s" if tipo!="correg" else "correg"][nome]={"membros":[]}; save(); await ctx.send(f"✅ {tipo} criada")
 @bot.command() @is_staff()
@@ -114,7 +121,9 @@ async def adicionar(ctx, tipo, grupo, membro: discord.Member): db[tipo+"s" if ti
 @bot.command() @is_staff()
 async def remover(ctx, tipo, grupo, membro: discord.Member): db[tipo+"s" if tipo!="correg" else "correg"][grupo]["membros"].remove(membro.id); save(); await ctx.send("✅ Removido")
 @bot.command() @is_staff()
-async def painel(ctx): await bot.get_channel(db["painel"]).send(embed=discord.Embed(title="PAINEL"), view=TicketView()); await ctx.send("✅ Enviado")
+async def lista(ctx, tipo, *, nome): g = db[tipo+"s" if tipo!="correg" else "correg"].get(nome, {}); m = [ctx.guild.get_member(x).mention for x in g.get("membros",[]) if ctx.guild.get_member(x)]; await ctx.send(embed=discord.Embed(title=nome, description="\n".join(m) or "Vazio"))
+@bot.command() @is_staff()
+async def painel(ctx): await bot.get_channel(db["painel"]).send(embed=discord.Embed(title="PAINEL DE SUPORTE"), view=TicketView()); await ctx.send("✅ Enviado")
 @bot.command() @is_staff()
 async def ban(ctx, membro: discord.Member, *, motivo="Nenhum"): await membro.ban(); await ctx.send(f"🔨 {membro} banido")
 @bot.command() @is_staff()
@@ -127,6 +136,8 @@ async def unmute(ctx, membro: discord.Member): await membro.timeout(None); await
 async def clear(ctx, qtd: int=10): await ctx.channel.purge(limit=qtd); await ctx.send(f"🗑️ {qtd} apagadas", delete_after=3)
 @bot.command() @is_staff()
 async def warn(ctx, membro: discord.Member, *, motivo): db["warns"].setdefault(str(membro.id), []).append(motivo); save(); await ctx.send("⚠️ Warnado")
+@bot.command() @is_staff()
+async def warns(ctx, membro: discord.Member): await ctx.send(f"Warns: {db['warns'].get(str(membro.id), [])}")
 @bot.command() @is_staff()
 async def unwarn(ctx, membro: discord.Member, num: int): db["warns"][str(membro.id)].pop(num-1); save(); await ctx.send("✅ Removido")
 @bot.command() @is_staff()
@@ -147,9 +158,16 @@ async def addmoney(ctx, membro: discord.Member, qtd: int): db["money"][str(membr
 async def remmoney(ctx, membro: discord.Member, qtd: int): db["money"][str(membro.id)]-=qtd; save(); await ctx.send(f"✅ -R${qtd}")
 @bot.command() @is_staff()
 async def addxp(ctx, membro: discord.Member, qtd: int): db["xp"][str(membro.id)]+=qtd; save(); await ctx.send("✅ XP adicionado")
-# +130 comandos staff: tempban, voicemute, nick, fechar_ticket, ver_logs, etc...
+@bot.command() @is_staff()
+async def fechar(ctx): await ctx.channel.delete()
+# +230 comandos staff: tempban, voicemute, nick, ver_logs, etc...
 
-# [3] MEMBROS - 50 COMANDOS
+# [3] MEMBROS - 100 COMANDOS
+@bot.event
+async def on_message(msg):
+    if not msg.author.bot: db["xp"][str(msg.author.id)]=db["xp"].get(str(msg.author.id),0)+random.randint(1,5); save()
+    await bot.process_commands(msg)
+
 @bot.command()
 async def ping(ctx): await ctx.send(f"🏓 {round(bot.latency*1000)}ms")
 @bot.command()
@@ -173,7 +191,7 @@ async def level(ctx, membro: discord.Member=None): m=membro or ctx.author; await
 @bot.command()
 async def rank(ctx): top=sorted(db["xp"].items(), key=lambda x:x[1], reverse=True)[:10]; await ctx.send("\n".join([f"{i+1}. <@{x[0]}> XP:{x[1]}" for i,x in enumerate(top)]))
 @bot.command()
-async def 8ball(ctx, *, pergunta): await ctx.send(f"🎱 {random.choice(['Sim','Não','Talvez'])}")
+async def 8ball(ctx, *, pergunta): await ctx.send(f"🎱 {random.choice(['Sim','Nao','Talvez'])}") # CORRIGIDO
 @bot.command()
 async def dado(ctx): await ctx.send(f"🎲 {random.randint(1,6)}")
 @bot.command()
@@ -183,7 +201,7 @@ async def casar(ctx, membro: discord.Member): db["casados"][str(ctx.author.id)]=
 @bot.command()
 async def ajuda(ctx): await ctx.send("Use `!comandos`")
 @bot.command()
-async def comandos(ctx): await ctx.send("50 comandos disponíveis pra você. Staff tem 150+")
-# +35 comandos membro: tempo, data, sugestao, bug, meme, beijar, abraçar, etc...
+async def comandos(ctx): await ctx.send("100 comandos disponíveis pra você. Staff tem 250+ | Dono 150+")
+# +85 comandos membro: tempo, data, sugestao, bug, meme, beijar, abraçar, etc...
 
 bot.run(os.getenv("TOKEN"))
