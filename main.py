@@ -31,10 +31,6 @@ def is_dono():
     def predicate(ctx): return ctx.author.id == DONO_ID
     return commands.check(predicate)
 
-def is_comando(guild, user, org):
-    cargos_comando = [f"👑 Alto Comando", f"Comandante Geral {org}", f"Dono {org}"]
-    return any(discord.utils.get(guild.roles, name=c) in user.roles for c in cargos_comando)
-
 def pode_fazer_porte(guild, user):
     cargos_delegado = ["Delegado PC", "Delegado Titular PC", "Delegado Geral PC", "Chefe de Polícia"]
     return any(discord.utils.get(guild.roles, name=c) in user.roles for c in cargos_delegado)
@@ -52,40 +48,9 @@ class PorteModal(Modal, title="Emitir Porte de Arma - PC"):
         if canal: await canal.send(f"✅ **PORTE EMITIDO**\nNome: {self.nome.value}\nCPF: {self.cpf.value}\nDelegado: {interaction.user.mention}")
         await interaction.response.send_message(f"✅ Porte emitido", ephemeral=True)
 
-class TicketButton(View):
-    def __init__(self, fac): super().__init__(timeout=None); self.fac = fac
-    @discord.ui.button(label="ABRIR TICKET", style=discord.ButtonStyle.green, emoji="🎫")
-    async def abrir(self, interaction: discord.Interaction, button: Button):
-        user = interaction.user; guild = interaction.guild; fac = self.fac
-        if str(user.id) in db.get("tickets", {}): return await interaction.response.send_message(f"❌ Já tem ticket", ephemeral=True)
-        atendente = discord.utils.get(guild.roles, name="📞 Atendente Ticket")
-        overwrites = {guild.default_role: discord.PermissionOverwrite(view_channel=False), user: discord.PermissionOverwrite(view_channel=True, send_messages=True), atendente: discord.PermissionOverwrite(view_channel=True, send_messages=True)}
-        categoria = discord.utils.get(guild.categories, name=f"📞 ATENDIMENTO {fac}")
-        ticket = await guild.create_text_channel(f"🎫│{user.name}", category=categoria, overwrites=overwrites)
-        db["tickets"][str(user.id)] = {"id": ticket.id, "fac": fac}; save()
-        await ticket.send(f"{atendente.mention}", embed=discord.Embed(title=f"Ticket {fac}"), view=TicketControl())
-        await interaction.response.send_message(f"✅ Ticket: {ticket.mention}", ephemeral=True)
-
-class TicketControl(View):
-    @discord.ui.button(label="ASSUMIR", style=discord.ButtonStyle.blurple, emoji="👮")
-    async def assumir(self, interaction: discord.Interaction, button: Button):
-        if not any(r.name == "📞 Atendente Ticket" for r in interaction.user.roles): return await interaction.response.send_message("❌ Sem permissão", ephemeral=True)
-        dono_ticket = interaction.channel.name.split("│")[1]
-        membro = discord.utils.get(interaction.guild.members, name=dono_ticket)
-        for role in interaction.guild.roles: await interaction.channel.set_permissions(role, view_channel=False)
-        await interaction.channel.set_permissions(membro, view_channel=True, send_messages=True)
-        await interaction.channel.set_permissions(interaction.user, view_channel=True, send_messages=True, manage_channels=True)
-        await interaction.response.send_message(f"🔒 LOCK ATIVO")
-    @discord.ui.button(label="FECHAR", style=discord.ButtonStyle.red, emoji="🔒")
-    async def fechar(self, interaction: discord.Interaction, button: Button):
-        for user_id, data in db["tickets"].items():
-            if data["id"] == interaction.channel.id: del db["tickets"][user_id]; break
-        save(); await interaction.channel.delete()
-
 @bot.command()
 @is_dono()
 async def promover(ctx, membro: discord.Member, *, cargo_novo: str):
-    if not is_comando(ctx.guild, ctx.author, "PM"): return await ctx.send("❌ Só Alto Comando")
     cargo = discord.utils.get(ctx.guild.roles, name=cargo_novo)
     if not cargo: return await ctx.send("❌ Cargo não existe")
     for c in membro.roles:
@@ -96,7 +61,6 @@ async def promover(ctx, membro: discord.Member, *, cargo_novo: str):
 @bot.command()
 @is_dono()
 async def rebaixar(ctx, membro: discord.Member, *, cargo_novo: str):
-    if not is_comando(ctx.guild, ctx.author, "PM"): return await ctx.send("❌ Só Alto Comando")
     cargo = discord.utils.get(ctx.guild.roles, name=cargo_novo)
     for c in membro.roles:
         if "PM" in c.name or "PC" in c.name or "CV" in c.name: await membro.remove_roles(c)
@@ -106,7 +70,6 @@ async def rebaixar(ctx, membro: discord.Member, *, cargo_novo: str):
 @bot.command()
 @is_dono()
 async def exonerar(ctx, membro: discord.Member):
-    if not is_comando(ctx.guild, ctx.author, "PM"): return await ctx.send("❌ Só Alto Comando")
     for c in membro.roles:
         if "PM" in c.name or "PC" in c.name or "CV" in c.name: await membro.remove_roles(c)
     civil = discord.utils.get(ctx.guild.roles, name="Civil")
@@ -135,49 +98,50 @@ async def setup(ctx, org=None):
         }
     }
     CORES = {"PM": discord.Color.blue()}
-    orgs_para_criar = ORGS.keys() if org is None or org.upper() == "ALL" else [org.upper()]
     
-    # CORRIGIDO: Não usa msg.edit pra não dar erro 404
-    await ctx.send(f"⚡ INICIANDO SETUP PM... ISSO VAI DEMORAR 3 MIN")
+    await ctx.send(f"⚡ INICIANDO SETUP PM TANQUE... VAI DEMORAR 5 MIN MAS NÃO CAI")
 
-    for o in orgs_para_criar:
+    for o in ORGS:
         dados = ORGS[o]; cor = CORES[o]; cargo_ids = {}; criados = 0
-        status_msg = await ctx.send(f"⚡ {o}: Criando 22 cargos... 0/22")
-
-        for i, nome_cargo in enumerate(dados["cargos"]):
-            try:
-                perms = discord.Permissions()
-                if "Alto Comando" in nome_cargo or "Comandante" in nome_cargo:
-                    perms = discord.Permissions(manage_roles=True, kick_members=True, ban_members=True, manage_channels=True, manage_messages=True)
-                cargo = await ctx.guild.create_role(name=nome_cargo, color=cor, permissions=perms)
-                cargo_ids[nome_cargo] = cargo.id
-                criados += 1
-                try: await status_msg.edit(content=f"⚡ {o}: Criando cargos... {criados}/22")
-                except: pass # IGNORA ERRO SE MENSAGEM SUMIR
-            except Exception as e: print(f"Erro cargo {nome_cargo}: {e}")
-            await asyncio.sleep(2) # 2 SEGUNDOS = ANTI RATE LIMIT
+        
+        # CRIA CARGOS EM LOTES DE 3 COM PAUSA DE 10S
+        await ctx.send(f"⚡ {o}: Criando 22 cargos...")
+        for i in range(0, len(dados["cargos"]), 3):
+            lote = dados["cargos"][i:i+3]
+            for nome_cargo in lote:
+                try:
+                    perms = discord.Permissions()
+                    if "Alto Comando" in nome_cargo or "Comandante" in nome_cargo:
+                        perms = discord.Permissions(manage_roles=True, kick_members=True, ban_members=True, manage_channels=True, manage_messages=True)
+                    cargo = await ctx.guild.create_role(name=nome_cargo, color=cor, permissions=perms)
+                    cargo_ids[nome_cargo] = cargo.id
+                    criados += 1
+                except Exception as e: print(f"Erro cargo: {e}")
+                await asyncio.sleep(3) # 3 SEGUNDOS
+            await ctx.send(f"⚡ Progresso cargos: {criados}/22")
+            await asyncio.sleep(10) # PAUSA DE 10S A CADA 3 CARGOS PRA NÃO TOMAR 429
 
         # CATEGORIAS + DIVISÕES
         categorias_reais = {
-            f"📋 ADMINISTRAÇÃO {o}": ["📢│avisos-internos","💬│chat-oficiais","📊│relatorios","📑│documentos"],
-            f"🚨 OPERAÇÕES {o}": ["🚨│ocorrencias-ativas","🚨│ocorrencias-arquivo","📍│patrulhamento","📹│evidencias"],
+            f"📋 ADMINISTRAÇÃO {o}": ["📢│avisos-internos","💬│chat-oficiais","📊│relatorios"],
+            f"🚨 OPERAÇÕES {o}": ["🚨│ocorrencias-ativas","🚨│ocorrencias-arquivo","📍│patrulhamento"],
             f"🚔 LOGÍSTICA {o}": ["🚔│viaturas","📦│armamento","💰│tesouraria"],
             f"📚 TREINAMENTO {o}": ["📚│academia","🎯│estande-tiro"],
-            f"📞 COMUNICAÇÃO {o}": ["🔊│radio-central","🎙️│sala-reuniao"],
+            f"📞 COMUNICAÇÃO {o}": ["🔊│radio-central"],
             f"📈 PROMOÇÃO {o}": ["📈│requerimento-promocao"],
             f"📊 HIERARQUIA {o}": ["📊│tabela-cargos"],
-            f"📞 OUVIDORIA {o}": ["📞│ouvidoria","📋│denuncias"]
+            f"📞 OUVIDORIA {o}": ["📞│ouvidoria"]
         }
 
         for div in dados["divisoes"]:
-            categorias_reais[f"{div} {o}"] = [f"💬│chat-{div.split()[1].lower()}",f"📋│ocorrencias-{div.split()[1].lower()}",f"🔊│radio-{div.split()[1].lower()}"]
+            categorias_reais[f"{div} {o}"] = [f"💬│chat-{div.split()[1].lower()}",f"📋│ocorrencias-{div.split()[1].lower()}"]
 
-        await ctx.send(f"⚡ {o}: Criando 11 categorias + 5 divisões...")
+        await ctx.send(f"⚡ Criando 11 categorias + 5 divisões...")
         total_canais = 0
         for nome_cat, canais in categorias_reais.items():
             try:
                 categoria = await ctx.guild.create_category(nome_cat)
-                await asyncio.sleep(2)
+                await asyncio.sleep(3)
                 for nome_canal in canais:
                     try:
                         if "radio" in nome_canal:
@@ -185,9 +149,9 @@ async def setup(ctx, org=None):
                         else:
                             await ctx.guild.create_text_channel(nome_canal, category=categoria)
                         total_canais += 1
-                    except Exception as e: print(f"Erro canal {nome_canal}: {e}")
-                    await asyncio.sleep(2)
-            except Exception as e: print(f"Erro categoria {nome_cat}: {e}")
+                    except Exception as e: print(f"Erro canal: {e}")
+                    await asyncio.sleep(3)
+            except Exception as e: print(f"Erro categoria: {e}")
 
         canal_hierarquia = discord.utils.get(ctx.guild.channels, name=f"📊│tabela-cargos")
         if canal_hierarquia:
@@ -201,16 +165,16 @@ async def setup(ctx, org=None):
 @bot.command()
 @is_dono()
 async def limpar(ctx):
-    await ctx.send(f"⚡ APAGANDO TUDO... AGUARDE 1 MIN")
+    await ctx.send(f"⚡ APAGANDO TUDO... AGUARDE 2 MIN")
     for channel in ctx.guild.channels:
-        try: await channel.delete(); await asyncio.sleep(1.5)
+        try: await channel.delete(); await asyncio.sleep(2)
         except: pass
     for category in ctx.guild.categories:
-        try: await category.delete(); await asyncio.sleep(1.5)
+        try: await category.delete(); await asyncio.sleep(2)
         except: pass
     for role in ctx.guild.roles:
         if role.name!= "@everyone" and not role.managed:
-            try: await role.delete(); await asyncio.sleep(1.5)
+            try: await role.delete(); await asyncio.sleep(2)
             except: pass
     db["corps"] = {}; db["tickets"] = {}; save()
     await ctx.send(f"✅ SERVIDOR LIMPO")
