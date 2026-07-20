@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+from discord.ui import View, Button, Modal, TextInput
 import os, json, asyncio, random
 from flask import Flask
 from threading import Thread
@@ -17,7 +18,7 @@ DONO_ID = 1438010935783460954
 ARQUIVO = 'config.json'
 try:
     with open(ARQUIVO, 'r', encoding='utf-8') as f: db = json.load(f)
-except: db = {"economia":{}, "warns":{}, "sorteio":{}}
+except: db = {"economia":{}, "warns":{}, "corps":{}, "hierarquia":{}, "tickets":{}}
 
 def save():
     with open(ARQUIVO, 'w', encoding='utf-8') as f: json.dump(db, f, ensure_ascii=False, indent=4)
@@ -30,215 +31,208 @@ def is_staff(guild, user):
     cargos_staff = ["👑 Alto Comando", "Admin", "Moderador", "Staff", "Comandante Geral PM"]
     return any(discord.utils.get(guild.roles, name=c) in user.roles for c in cargos_staff)
 
-# ============ 1. LORITA = MODERAÇÃO = 30 COMANDOS ============
-@bot.command() 
-async def ban(ctx, membro: discord.Member, *, motivo="Sem motivo"):
-    if not is_staff(ctx.guild, ctx.author): return await ctx.send("❌ Sem permissão")
-    await membro.ban(reason=motivo)
-    await ctx.send(f"🔨 {membro.mention} foi banido. Motivo: {motivo}")
+# ============ SISTEMA DE TICKET ============
+class PainelTicket(View):
+    def __init__(self):
+        super().__init__(timeout=None)
 
-@bot.command()
-async def kick(ctx, membro: discord.Member, *, motivo="Sem motivo"):
-    if not is_staff(ctx.guild, ctx.author): return await ctx.send("❌ Sem permissão")
-    await membro.kick(reason=motivo)
-    await ctx.send(f"👢 {membro.mention} foi kickado. Motivo: {motivo}")
+    @discord.ui.button(label="Suporte", style=discord.ButtonStyle.blurple, emoji="🎫")
+    async def suporte(self, i, b):
+        await criar_ticket(i, "suporte")
 
-@bot.command()
-async def mute(ctx, membro: discord.Member, *, tempo="10m"):
-    if not is_staff(ctx.guild, ctx.author): return await ctx.send("❌ Sem permissão")
-    cargo_mute = discord.utils.get(ctx.guild.roles, name="Mutado")
-    if not cargo_mute: cargo_mute = await ctx.guild.create_role(name="Mutado")
-    await membro.add_roles(cargo_mute)
-    await ctx.send(f"🔇 {membro.mention} foi mutado por {tempo}")
+    @discord.ui.button(label="Denuncia", style=discord.ButtonStyle.danger, emoji="🚨")
+    async def denuncia(self, i, b):
+        await criar_ticket(i, "denuncia")
 
-@bot.command()
-async def unmute(ctx, membro: discord.Member):
-    if not is_staff(ctx.guild, ctx.author): return await ctx.send("❌ Sem permissão")
-    cargo_mute = discord.utils.get(ctx.guild.roles, name="Mutado")
-    await membro.remove_roles(cargo_mute)
-    await ctx.send(f"🔊 {membro.mention} foi desmutado")
+    @discord.ui.button(label="Whitelist", style=discord.ButtonStyle.green, emoji="✅")
+    async def whitelist(self, i, b):
+        await criar_ticket(i, "whitelist")
 
-@bot.command()
-async def warn(ctx, membro: discord.Member, *, motivo):
-    if not is_staff(ctx.guild, ctx.author): return await ctx.send("❌ Sem permissão")
-    db["warns"][str(membro.id)] = db["warns"].get(str(membro.id), 0) + 1; save()
-    await ctx.send(f"⚠️ {membro.mention} recebeu um warn. Total: {db['warns'][str(membro.id)]}")
+    @discord.ui.button(label="Loja VIP", style=discord.ButtonStyle.success, emoji="💎")
+    async def loja(self, i, b):
+        await criar_ticket(i, "loja")
 
-@bot.command()
-async def limpar(ctx, qtd: int):
-    if not is_staff(ctx.guild, ctx.author): return await ctx.send("❌ Sem permissão")
-    await ctx.channel.purge(limit=qtd)
-    await ctx.send(f"✅ {qtd} mensagens apagadas")
+class PainelStaffTicket(View):
+    def __init__(self, dono_id):
+        super().__init__(timeout=None)
+        self.dono_id = dono_id
 
-# ============ 2. DYNO = ADMIN = 20 COMANDOS ============
-@bot.command()
-async def slowmode(ctx, segundos: int):
-    if not is_staff(ctx.guild, ctx.author): return await ctx.send("❌ Sem permissão")
-    await ctx.channel.edit(slowmode_delay=segundos)
-    await ctx.send(f"🐢 Slowmode: {segundos}s")
+    @discord.ui.button(label="Assumir", style=discord.ButtonStyle.green, emoji="👮")
+    async def assumir(self, i, b):
+        if not is_staff(i.guild, i.user):
+            return await i.response.send_message("❌ Só Staff pode assumir", ephemeral=True)
 
-@bot.command()
-async def lock(ctx):
-    if not is_staff(ctx.guild, ctx.author): return await ctx.send("❌ Sem permissão")
-    await ctx.channel.set_permissions(ctx.guild.default_role, send_messages=False)
-    await ctx.send("🔒 Canal trancado")
+        channel = i.channel
+        await channel.set_permissions(i.user, send_messages=True, view_channel=True)
+        await channel.set_permissions(i.guild.default_role, send_messages=False)
+        await channel.set_permissions(i.guild.get_member(self.dono_id), send_messages=True)
 
-@bot.command()
-async def unlock(ctx):
-    if not is_staff(ctx.guild, ctx.author): return await ctx.send("❌ Sem permissão")
-    await ctx.channel.set_permissions(ctx.guild.default_role, send_messages=True)
-    await ctx.send("🔓 Canal destrancado")
+        db["tickets"][str(channel.id)] = {"dono": self.dono_id, "staff": i.user.id}
+        save()
 
-@bot.command()
-async def nick(ctx, membro: discord.Member, *, novo_nick):
-    if not is_staff(ctx.guild, ctx.author): return await ctx.send("❌ Sem permissão")
-    await membro.edit(nick=novo_nick)
-    await ctx.send(f"📝 Nick alterado para {novo_nick}")
+        await i.response.send_message(f"✅ Ticket assumido por {i.user.mention}", ephemeral=False)
 
-# ============ 3. CARL = ROLES = 10 COMANDOS ============
+    @discord.ui.button(label="Fechar", style=discord.ButtonStyle.red, emoji="🔒")
+    async def fechar(self, i, b):
+        if not is_staff(i.guild, i.user):
+            return await i.response.send_message("❌ Só Staff pode fechar", ephemeral=True)
+        await i.response.send_message("⚠️ Fechando ticket em 5s...")
+        await asyncio.sleep(5)
+        await i.channel.delete()
+        if str(i.channel.id) in db["tickets"]: del db["tickets"][str(i.channel.id)]; save()
+
+async def criar_ticket(interaction, tipo):
+    guild = interaction.guild
+    user = interaction.user
+
+    # 1 TICKET POR PESSOA
+    for ch_id, data in db["tickets"].items():
+        if data["dono"] == user.id:
+            return await interaction.response.send_message("❌ Você já tem um ticket aberto. Feche ele primeiro.", ephemeral=True)
+
+    category = discord.utils.get(guild.categories, name="🎫 TICKETS")
+    if not category:
+        category = await guild.create_category("🎫 TICKETS")
+
+    overwrites = {
+        guild.default_role: discord.PermissionOverwrite(view_channel=False),
+        user: discord.PermissionOverwrite(view_channel=True, send_messages=True),
+        discord.utils.get(guild.roles, name="Staff"): discord.PermissionOverwrite(view_channel=True),
+        discord.utils.get(guild.roles, name="Admin"): discord.PermissionOverwrite(view_channel=True),
+    }
+
+    channel = await guild.create_text_channel(f"ticket-{user.name}", overwrites=overwrites, category=category)
+
+    db["tickets"][str(channel.id)] = {"dono": user.id, "tipo": tipo, "staff": None}
+    save()
+
+    embed = discord.Embed(title=f"🎫 Ticket {tipo.upper()}", description=f"Olá {user.mention}\nUm Staff irá te atender em breve.", color=discord.Color.blue())
+    await channel.send(content=user.mention, embed=embed, view=PainelStaffTicket(user.id))
+    await interaction.response.send_message(f"✅ Ticket criado: {channel.mention}", ephemeral=True)
+
 @bot.command()
 @is_dono()
-async def autorole(ctx, *, cargo):
-    await ctx.send(f"✅ AutoRole: {cargo}")
+async def setupticket(ctx):
+    embed = discord.Embed(title="🏠 Painel Principal", description="Clique no botão abaixo para abrir um ticket", color=discord.Color.purple())
+    await ctx.send(embed=embed, view=PainelTicket())
+    await ctx.send("✅ Painel de Ticket criado!")
 
+# ============ SETUP COMPLETO + TICKET ============
 @bot.command()
-async def role(ctx, membro: discord.Member, *, cargo):
-    if not is_staff(ctx.guild, ctx.author): return await ctx.send("❌ Sem permissão")
+@is_dono()
+async def setup(ctx, corp: str = "PM"):
+    corp = corp.upper()
+    await ctx.send(f"⚡ **INICIANDO SETUP DA {corp}**...")
+    guild = ctx.guild
+
+    for channel in guild.channels:
+        try: await channel.delete()
+        except: pass
+        await asyncio.sleep(0.1)
+
+    everyone = guild.default_role
+    cargos_list = [
+        "👑 Alto Comando", f"Comandante Geral {corp}", f"Coronel {corp}", f"Major {corp}", f"Capitão {corp}",
+        f"Tenente {corp}", f"Sargento {corp}", f"Cabo {corp}", f"Soldado {corp}", f"Recruta {corp}",
+        f"ROTAM {corp}", f"ROCAM {corp}", f"CHOQUE {corp}", f"TRÂNSITO {corp}",
+        "Civil", "Staff", "Moderador", "Admin", "Mutado"
+    ]
+
+    roles = {}
+    for nome in cargos_list:
+        role = await guild.create_role(name=nome)
+        roles[nome] = role
+
+    await roles["👑 Alto Comando"].edit(permissions=discord.Permissions(administrator=True))
+    await roles["Admin"].edit(permissions=discord.Permissions(administrator=True))
+    await roles["Moderador"].edit(permissions=discord.Permissions(manage_messages=True, kick_members=True))
+    await roles["Staff"].edit(permissions=discord.Permissions(manage_messages=True))
+    await roles["Mutado"].edit(permissions=discord.Permissions(send_messages=False))
+
+    db["hierarquia"] = {nome: i for i, nome in enumerate(cargos_list[:10])}; save()
+
+    overw_corp = {everyone: discord.PermissionOverwrite(view_channel=False), roles[f"Recruta {corp}"]: discord.PermissionOverwrite(view_channel=True)}
+    overw_civil = {everyone: discord.PermissionOverwrite(view_channel=True)}
+
+    cat_corp = await guild.create_category(f"🚔 {corp}", overwrites=overw_corp)
+    await guild.create_text_channel("📋│boletim", category=cat_corp)
+
+    cat_ticket = await guild.create_category("🎫 TICKETS")
+    await guild.create_text_channel("📢│painel-ticket", category=cat_ticket)
+
+    cat_civil = await guild.create_category("👤 CIVIL", overwrites=overw_civil)
+    await guild.create_text_channel("💬│geral", category=cat_civil)
+
+    db["corps"][str(guild.id)] = corp; save()
+    await ctx.send(f"✅ **SETUP CONCLUÍDO!**\nUse `!setupticket` no canal pra criar o painel")
+
+# ============ COMANDOS SETSTAFF ============
+@bot.command()
+@is_dono()
+async def setstaff(ctx, membro: discord.Member, *, cargo: str):
     cargo_obj = discord.utils.get(ctx.guild.roles, name=cargo)
+    if not cargo_obj: return await ctx.send(f"❌ Cargo `{cargo}` não existe")
     await membro.add_roles(cargo_obj)
-    await ctx.send(f"✅ Cargo {cargo} dado para {membro.mention}")
+    await ctx.send(f"✅ {membro.mention} agora é **{cargo}**")
 
-# ============ 4. MEE6 = ECONOMIA + LEVEL = 40 COMANDOS ============
-@bot.command()
-async def level(ctx, membro: discord.Member=None):
-    membro = membro or ctx.author
-    await ctx.send(f"📊 {membro.mention} | Level 1 | XP: 0/100")
-
-@bot.command()
-async def rank(ctx):
-    await ctx.send(f"🏆 Top 10 do servidor")
+# ============ PAINEL STAFF ============
+class PainelStaff(View):
+    @discord.ui.button(label="PROMOVER", style=discord.ButtonStyle.green, emoji="📈")
+    async def promover(self, i, b):
+        if not is_staff(i.guild, i.user): return await i.response.send_message("❌ Sem permissão", ephemeral=True)
+        await i.response.send_message("Use: `!promover @membro Cargo`", ephemeral=True)
 
 @bot.command()
-async def saldo(ctx):
-    saldo = db["economia"].get(str(ctx.author.id), 1000)
-    await ctx.send(f"💰 Seu saldo: R${saldo}")
+async def painelstaff(ctx):
+    if not is_staff(ctx.guild, ctx.author): return await ctx.send("❌ Só Staff")
+    embed = discord.Embed(title="👮 PAINEL STAFF", color=discord.Color.dark_blue())
+    await ctx.send(embed=embed, view=PainelStaff())
+
+# ============ HIERARQUIA ============
+def tem_permissao_promover(cargo_nome):
+    return any(x in cargo_nome for x in ["👑 Alto Comando", "Comandante", "Coronel", "Major", "Capitão"])
+
+def pegar_maior_cargo(membro, corp):
+    for role in membro.roles:
+        if corp in role.name: return role.name
+    return "Civil"
 
 @bot.command()
-async def trabalhar(ctx):
-    ganho = random.randint(100, 500)
-    db["economia"][str(ctx.author.id)] = db["economia"].get(str(ctx.author.id), 1000) + ganho; save()
-    await ctx.send(f"💼 Você trabalhou e ganhou R${ganho}")
-
-@bot.command()
-async def roubar(ctx, membro: discord.Member):
-    ganho = random.randint(50, 200)
-    await ctx.send(f"😈 Você roubou R${ganho} de {membro.mention}")
-
-@bot.command()
-async def daily(ctx):
-    await ctx.send(f"🎁 Daily de R$500 recebida!")
-
-# ============ 5. EVENTOS LORITA = 3 COMANDOS NOVOS ============
-@bot.command()
-@is_dono()
-async def anuncio(ctx, *, texto):
-    await ctx.send(f"📢 **ANÚNCIO**\n{texto}")
-
-@bot.command()
-@is_dono()
-async def sorteio(ctx, tempo: int, *, premio):
-    await ctx.send(f"🎉 **SORTEIO**\nPrêmio: {premio}\nReaja com 🎉 para participar! Dura {tempo}s")
-    await asyncio.sleep(tempo)
-    await ctx.send(f"🎉 Sorteio do {premio} finalizado!")
-
-@bot.command()
-async def votar(ctx, *, pergunta):
-    msg = await ctx.send(f"📊 **VOTAÇÃO**: {pergunta}")
-    await msg.add_reaction("👍")
-    await msg.add_reaction("👎")
-
-# ============ 6. TICKET = 10 COMANDOS ============
-@bot.command()
-async def ticket(ctx):
-    await ctx.send(f"🎫 Ticket criado! Aguarde um Staff")
-
-@bot.command()
-async def fechar(ctx):
-    if not is_staff(ctx.guild, ctx.author): return await ctx.send("❌ Sem permissão")
-    await ctx.send(f"🔒 Fechando em 5s...")
-    await asyncio.sleep(5)
-    await ctx.channel.delete()
-
-# ============ 7. SEUS 100+ COMANDOS RP ============
-@bot.command()
-@is_dono()
 async def promover(ctx, membro: discord.Member, *, cargo_novo: str):
-    cargo = discord.utils.get(ctx.guild.roles, name=cargo_novo)
+    corp = db["corps"].get(str(ctx.guild.id), "PM")
+    cargo_autor = pegar_maior_cargo(ctx.author, corp)
+    if not tem_permissao_promover(cargo_autor): return await ctx.send("❌ Só Capitão pra cima")
+    cargo_obj = discord.utils.get(ctx.guild.roles, name=cargo_novo)
     for c in membro.roles:
-        if "PM" in c.name or "PC" in c.name: await membro.remove_roles(c)
-    await membro.add_roles(cargo)
+        if corp in c.name: await membro.remove_roles(c)
+    await membro.add_roles(cargo_obj)
     await ctx.send(f"✅ {membro.mention} promovido para **{cargo_novo}**")
 
 @bot.command()
-async def rebaixar(ctx, membro: discord.Member, *, cargo_novo: str):
-    if not is_staff(ctx.guild, ctx.author): return await ctx.send("❌ Sem permissão")
-    cargo = discord.utils.get(ctx.guild.roles, name=cargo_novo)
+async def exonerar(ctx, membro: discord.Member):
+    corp = db["corps"].get(str(ctx.guild.id), "PM")
+    cargo_autor = pegar_maior_cargo(ctx.author, corp)
+    if not tem_permissao_promover(cargo_autor): return await ctx.send("❌ Só Capitão pra cima")
     for c in membro.roles:
-        if "PM" in c.name or "PC" in c.name: await membro.remove_roles(c)
-    await membro.add_roles(cargo)
-    await ctx.send(f"✅ {membro.mention} rebaixado para **{cargo_novo}**")
+        if corp in c.name: await membro.remove_roles(c)
+    civil = discord.utils.get(ctx.guild.roles, name="Civil")
+    await membro.add_roles(civil)
+    await ctx.send(f"✅ {membro.mention} foi exonerado")
 
 @bot.command()
-async def porte(ctx):
-    await ctx.send("🔫 Use o formulário de porte")
-
-@bot.command()
-async def multa(ctx, membro: discord.Member, valor: int, *, motivo):
+async def ban(ctx, membro: discord.Member, *, motivo="Sem motivo"):
     if not is_staff(ctx.guild, ctx.author): return await ctx.send("❌ Sem permissão")
-    await ctx.send(f"🧾 {membro.mention} multado em R${valor} por: {motivo}")
+    await membro.ban(reason=motivo); await ctx.send(f"🔨 {membro.mention} banido")
 
-@bot.command()
-async def prender(ctx, membro: discord.Member, *, motivo):
-    if not is_staff(ctx.guild, ctx.author): return await ctx.send("❌ Sem permissão")
-    await ctx.send(f"⛓️ {membro.mention} preso por: {motivo}")
-
-@bot.command()
-@is_dono()
-async def setup(ctx, org="PM"):
-    await ctx.send(f"⚡ SETUP INICIADO...")
-
-@bot.command()
-@is_dono()
-async def limparserv(ctx):
-    await ctx.send(f"⚡ APAGANDO TUDO...")
-    for channel in ctx.guild.channels:
-        try: await channel.delete()
-        except: pass
-        await asyncio.sleep(0.5)
-    await ctx.send(f"✅ SERVIDOR LIMPO")
-
-# ============ 8. GERADOR 400 COMANDOS EXTRAS ============
 for i in range(1, 401):
     def make_cmd(num):
-        async def cmd(ctx):
-            await ctx.send(f"✅!cmd{num} funcionando!")
+        async def cmd(ctx): await ctx.send(f"✅!cmd{num} funcionando!")
         return cmd
     bot.add_command(commands.Command(make_cmd(i), name=f"cmd{i}"))
 
-@bot.command()
-async def help(ctx):
-    embed = discord.Embed(title="📋 MASTER BOT - 850+ COMANDOS", color=discord.Color.gold())
-    embed.add_field(name="MODERAÇÃO", value="`!ban` `!kick` `!mute` `!warn` `!limpar`", inline=False)
-    embed.add_field(name="ADMIN", value="`!lock` `!unlock` `!slowmode` `!nick`", inline=False)
-    embed.add_field(name="ECONOMIA", value="`!saldo` `!trabalhar` `!roubar` `!daily`", inline=False)
-    embed.add_field(name="EVENTOS", value="`!anuncio` `!sorteio` `!votar`", inline=False)
-    embed.add_field(name="RP", value="`!promover` `!porte` `!multa` `!prender`", inline=False)
-    embed.add_field(name="GERAL", value="`!cmd1` até `!cmd400`", inline=False)
-    await ctx.send(embed=embed)
-
 @bot.event
 async def on_ready():
-    print(f'✅ MASTER BOT ONLINE: {bot.user}')
-    print(f'✅ 850+ COMANDOS CARREGADOS')
+    print(f'✅ MASTER BOT ONLINE COM TICKET')
+    bot.add_view(PainelTicket())
 
 bot.run(os.getenv("TOKEN"))
