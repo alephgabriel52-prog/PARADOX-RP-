@@ -130,19 +130,20 @@ async def setup(ctx, org=None):
                 "Sub Ten PM","Asp Oficial PM","2º Ten PM","1º Ten PM","Cap PM","Major PM",
                 "Ten Cel PM","Cel PM","Sub Comandante Geral PM","Comandante Geral PM",
                 "🏅 Medalha","📊 Estatística","👑 Alto Comando","🔧 Logística","💰 Finanças"
-            ], # 22 CARGOS
+            ],
             "divisoes": ["🚔 1º BATALHÃO", "⚡ ROTA", "🛡️ BOP", "🚨 CHOQUE", "🚁 AEROPOL"]
         }
     }
     CORES = {"PM": discord.Color.blue()}
     orgs_para_criar = ORGS.keys() if org is None or org.upper() == "ALL" else [org.upper()]
-    msg = await ctx.send(f"⚡ INICIANDO SETUP PM...")
+    
+    # CORRIGIDO: Não usa msg.edit pra não dar erro 404
+    await ctx.send(f"⚡ INICIANDO SETUP PM... ISSO VAI DEMORAR 3 MIN")
 
     for o in orgs_para_criar:
-        dados = ORGS[o]; cor = CORES[o]; cargo_ids = {}; erros = 0
-        await msg.edit(content=f"⚡ {o}: Criando 22 cargos... 1/22")
+        dados = ORGS[o]; cor = CORES[o]; cargo_ids = {}; criados = 0
+        status_msg = await ctx.send(f"⚡ {o}: Criando 22 cargos... 0/22")
 
-        # CRIA CARGOS 1 POR 1 COM TRATAMENTO DE ERRO
         for i, nome_cargo in enumerate(dados["cargos"]):
             try:
                 perms = discord.Permissions()
@@ -150,15 +151,13 @@ async def setup(ctx, org=None):
                     perms = discord.Permissions(manage_roles=True, kick_members=True, ban_members=True, manage_channels=True, manage_messages=True)
                 cargo = await ctx.guild.create_role(name=nome_cargo, color=cor, permissions=perms)
                 cargo_ids[nome_cargo] = cargo.id
-                await msg.edit(content=f"⚡ {o}: Criando cargos... {i+1}/22")
-            except Exception as e:
-                erros += 1
-                print(f"Erro cargo {nome_cargo}: {e}")
-            await asyncio.sleep(1) # 1 SEGUNDO PRA NÃO CAIR
+                criados += 1
+                try: await status_msg.edit(content=f"⚡ {o}: Criando cargos... {criados}/22")
+                except: pass # IGNORA ERRO SE MENSAGEM SUMIR
+            except Exception as e: print(f"Erro cargo {nome_cargo}: {e}")
+            await asyncio.sleep(2) # 2 SEGUNDOS = ANTI RATE LIMIT
 
-        comando = ctx.guild.get_role(cargo_ids.get("Comandante Geral PM"))
-
-        # CRIA CATEGORIAS + DIVISÕES
+        # CATEGORIAS + DIVISÕES
         categorias_reais = {
             f"📋 ADMINISTRAÇÃO {o}": ["📢│avisos-internos","💬│chat-oficiais","📊│relatorios","📑│documentos"],
             f"🚨 OPERAÇÕES {o}": ["🚨│ocorrencias-ativas","🚨│ocorrencias-arquivo","📍│patrulhamento","📹│evidencias"],
@@ -170,16 +169,15 @@ async def setup(ctx, org=None):
             f"📞 OUVIDORIA {o}": ["📞│ouvidoria","📋│denuncias"]
         }
 
-        # ADICIONA DIVISÕES
         for div in dados["divisoes"]:
             categorias_reais[f"{div} {o}"] = [f"💬│chat-{div.split()[1].lower()}",f"📋│ocorrencias-{div.split()[1].lower()}",f"🔊│radio-{div.split()[1].lower()}"]
 
-        await msg.edit(content=f"⚡ {o}: Criando 11 categorias + 5 divisões...")
+        await ctx.send(f"⚡ {o}: Criando 11 categorias + 5 divisões...")
         total_canais = 0
         for nome_cat, canais in categorias_reais.items():
             try:
                 categoria = await ctx.guild.create_category(nome_cat)
-                await asyncio.sleep(1)
+                await asyncio.sleep(2)
                 for nome_canal in canais:
                     try:
                         if "radio" in nome_canal:
@@ -188,10 +186,9 @@ async def setup(ctx, org=None):
                             await ctx.guild.create_text_channel(nome_canal, category=categoria)
                         total_canais += 1
                     except Exception as e: print(f"Erro canal {nome_canal}: {e}")
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(2)
             except Exception as e: print(f"Erro categoria {nome_cat}: {e}")
 
-        # ENVIA HIERARQUIA
         canal_hierarquia = discord.utils.get(ctx.guild.channels, name=f"📊│tabela-cargos")
         if canal_hierarquia:
             texto = f"**HIERARQUIA {o}**\n\n" + "\n".join([f"{i+1}. {cargo}" for i,cargo in enumerate(dados["cargos"])])
@@ -199,23 +196,23 @@ async def setup(ctx, org=None):
         db["corps"][o] = cargo_ids
 
     save()
-    await msg.edit(content=f"✅ **SETUP PM FINALIZADO**\n{total_canais} Canais | 22 Cargos | 5 Divisões\nErros: {erros}")
+    await ctx.send(f"✅ **SETUP PM FINALIZADO**\n{total_canais} Canais | {criados}/22 Cargos | 5 Divisões")
 
 @bot.command()
 @is_dono()
 async def limpar(ctx):
-    msg = await ctx.send(f"⚡ APAGANDO TUDO...")
+    await ctx.send(f"⚡ APAGANDO TUDO... AGUARDE 1 MIN")
     for channel in ctx.guild.channels:
-        try: await channel.delete(); await asyncio.sleep(1)
+        try: await channel.delete(); await asyncio.sleep(1.5)
         except: pass
     for category in ctx.guild.categories:
-        try: await category.delete(); await asyncio.sleep(1)
+        try: await category.delete(); await asyncio.sleep(1.5)
         except: pass
     for role in ctx.guild.roles:
         if role.name!= "@everyone" and not role.managed:
-            try: await role.delete(); await asyncio.sleep(1)
+            try: await role.delete(); await asyncio.sleep(1.5)
             except: pass
     db["corps"] = {}; db["tickets"] = {}; save()
-    await msg.edit(content=f"✅ SERVIDOR LIMPO")
+    await ctx.send(f"✅ SERVIDOR LIMPO")
 
 bot.run(os.getenv("TOKEN"))
