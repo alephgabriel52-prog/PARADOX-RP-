@@ -86,8 +86,7 @@ async def setup(ctx, fac):
     db["corps"][fac] = cargo_ids; save()
     await ctx.send(f"✅ **{fac} CRIADA** com {len(info['cargos'])} cargos reais")
 
-# ==================== 500 COMANDOS ====================
-# DONO - 150
+# ==================== COMANDOS DONO ====================
 @bot.command() @is_dono()
 async def reset(ctx): global db; db = {"log":None,"ticket_cat":None,"painel":None,"tickets":{},"corps":{},"warns":{},"money":{},"xp":{},"aura":{}}; save(); await ctx.send("✅ Resetado")
 @bot.command() @is_dono()
@@ -154,9 +153,8 @@ async def autorole(ctx): await ctx.send("✅ Autorole")
 async def welcome(ctx): await ctx.send("✅ Welcome")
 @bot.command() @is_dono()
 async def anunciarglobal(ctx): await ctx.send("✅ Anuncio global")
-# +120 comandos dono
 
-# STAFF - 250
+# ==================== COMANDOS STAFF ====================
 @bot.command() @is_staff()
 async def ban(ctx, membro: discord.Member, *, motivo="Nenhum"): await membro.ban(reason=motivo); await ctx.send(f"🔨 {membro} banido")
 @bot.command() @is_staff()
@@ -230,9 +228,8 @@ async def anunciar(ctx): await ctx.send("✅ Anunciar")
 async def aviso(ctx): await ctx.send("✅ Aviso")
 @bot.command() @is_staff()
 async def sorteio(ctx): await ctx.send("✅ Sorteio")
-# +220 comandos staff
 
-# MEMBRO - 100
+# ==================== COMANDOS MEMBRO ====================
 @bot.command()
 async def ping(ctx): await ctx.send(f"Pong: {round(bot.latency*1000)}ms")
 @bot.command()
