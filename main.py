@@ -18,7 +18,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 async def on_ready():
     print(f'✅ BOT ONLINE TURBO: {bot.user}')
 
-DONO_ID = 1438010935783460954
+DONO_ID = 1438010935783460954 # COLOCA SEU ID AQUI
 ARQUIVO = 'config.json'
 try:
     with open(ARQUIVO, 'r', encoding='utf-8') as f: db = json.load(f)
@@ -31,6 +31,12 @@ def is_dono():
     def predicate(ctx): return ctx.author.id == DONO_ID
     return commands.check(predicate)
 
+@bot.event
+async def on_command_error(ctx, error):
+    if isinstance(error, commands.CheckFailure):
+        await ctx.send("❌ **ACESSO NEGADO**\nEste comando é exclusivo do dono do bot.")
+
+# LOGOS - COLOCA LINK DA FOTO DE CADA ORG
 LOGOS = {
     "CV": "https://i.imgur.com/XXXXXX.png","PCCC": "https://i.imgur.com/XXXXXX.png","TCP": "https://i.imgur.com/XXXXXX.png",
     "BDM": "https://i.imgur.com/XXXXXX.png","RODO": "https://i.imgur.com/XXXXXX.png","PENHA": "https://i.imgur.com/XXXXXX.png","CDA": "https://i.imgur.com/XXXXXX.png",
@@ -90,12 +96,17 @@ async def setup(ctx, org=None):
         "CORREGEDORIA": {"tipo": "ORGAO","cargos": ["Civil","Corregedor Adjunto","Corregedor Geral","Ouvidor Geral"],"divisoes": ["📁 Processos PM", "📁 Processos PC", "📁 Processos PRF", "📁 Processos SAMU", "📁 Processos BOPE"]}
     }
 
-    CORES = {"CV": discord.Color.dark_red(),"PCCC": discord.Color.dark_green(),"TCP": discord.Color.purple(),"BDM": discord.Color.orange(),"RODO": discord.Color.blue(),"PENHA": discord.Color.teal(),"CDA": discord.Color.greyple(),"PM": discord.Color.blue(),"PC": discord.Color.dark_red(),"PRF": discord.Color.dark_green(),"SAMU": discord.Color.red(),"BOPE": discord.Color.black(),"TRIBUNAL": discord.Color.gold(),"CORREGEDORIA": discord.Color.dark_purple()}
+    CORES = {
+        "CV": discord.Color.dark_red(),"PCCC": discord.Color.dark_green(),"TCP": discord.Color.purple(),
+        "BDM": discord.Color.orange(),"RODO": discord.Color.blue(),"PENHA": discord.Color.teal(),"CDA": discord.Color.greyple(),
+        "PM": discord.Color.blue(),"PC": discord.Color.dark_red(),"PRF": discord.Color.dark_green(),"SAMU": discord.Color.red(),
+        "BOPE": discord.Color.from_rgb(0, 0, 0), # CORRIGIDO
+        "TRIBUNAL": discord.Color.gold(),"CORREGEDORIA": discord.Color.dark_purple()
+    }
 
     orgs_para_criar = ORGS.keys() if org is None or org.upper() == "ALL" else [org.upper()]
     msg = await ctx.send(f"⚡ MODO TURBO 0.1s ATIVADO")
 
-    # MUDA FOTO TURBO
     if org and org.upper() in LOGOS:
         async with aiohttp.ClientSession() as session:
             async with session.get(LOGOS[org.upper()]) as resp:
@@ -112,10 +123,7 @@ async def setup(ctx, org=None):
         dados = ORGS[o]; cor = CORES[o]; cargo_ids = {}
         await msg.edit(content=f"⚡ {o}: Criando {len(dados['cargos'])} cargos TURBO...")
 
-        # CRIA 50+ CARGOS SEM DELAY
-        tasks = []
-        for nome_cargo in dados["cargos"]:
-            tasks.append(ctx.guild.create_role(name=nome_cargo, color=cor, hoist="Comandante" in nome_cargo or "Dono" in nome_cargo or "Presidente" in nome_cargo))
+        tasks = [ctx.guild.create_role(name=nome_cargo, color=cor, hoist="Comandante" in nome_cargo or "Dono" in nome_cargo or "Presidente" in nome_cargo) for nome_cargo in dados["cargos"]]
         cargos = await asyncio.gather(*tasks)
         for i, cargo in enumerate(cargos): cargo_ids[dados["cargos"][i]] = cargo.id
 
@@ -151,7 +159,6 @@ async def setup(ctx, org=None):
             categorias_reais[f"{div} {o}"] = [f"💬│chat-{nome_div}",f"📋│ocorrencias-{nome_div}",f"🔊│radio-{nome_div}",f"📊│relatorio-{nome_div}"]
 
         await msg.edit(content=f"⚡ {o}: Criando 12 categorias TURBO...")
-        # CRIA TUDO JUNTO SEM DELAY
         for nome_cat, canais in categorias_reais.items():
             categoria = await ctx.guild.create_category(nome_cat); await asyncio.sleep(0.1)
             tasks = []
@@ -173,7 +180,6 @@ async def setup(ctx, org=None):
         if canal_hierarquia:
             texto = f"**HIERARQUIA {o}**\n\n" + "\n".join([f"{i+1}. {cargo}" for i,cargo in enumerate(dados["cargos"])])
             await canal_hierarquia.send(texto)
-
         db["corps"][o] = cargo_ids
 
     save()
@@ -198,7 +204,6 @@ async def setupstaff(ctx):
 @is_dono()
 async def limpar(ctx):
     msg = await ctx.send(f"⚡ APAGANDO TURBO 0.1s...")
-    # APAGA TUDO JUNTO
     tasks = [channel.delete() for channel in ctx.guild.channels]
     await asyncio.gather(*tasks)
     tasks = [category.delete() for category in ctx.guild.categories]
