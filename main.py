@@ -12,11 +12,10 @@ def run(): app.run(host='0.0.0.0', port=8080)
 Thread(target=run).start()
 
 intents = discord.Intents.all()
-intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
-DONO_ID = 1438010935783460954 # SÓ VOCÊ
-STAFF_ROLE_ID = 1528409545439969433
+DONO_ID = 1438010935783460954 # SEU ID
+STAFF_ROLE_ID = 1528409545439969433 # ID DO CARGO EQUIPE STAFF
 ARQUIVO = 'config.json'
 try:
     with open(ARQUIVO, 'r', encoding='utf-8') as f: db = json.load(f)
@@ -29,69 +28,92 @@ def is_dono():
     def predicate(ctx): return ctx.author.id == DONO_ID
     return commands.check(predicate)
 
-# ============ ANTI ROUBO TOTAL ============
+# ============ TEMPLATES CORP ============
+TEMPLATES = {
+    "PM": ["Recruta", "Soldado", "Cabo", "Sargento", "Subtenente", "Tenente", "Capitão", "Major", "Coronel"],
+    "PC": ["Estagiario", "Agente", "Escrivao", "Investigador", "Delegado"],
+    "BOPE": ["Recruta", "Soldado", "Cabo", "Sargento", "Tenente", "Capitao"],
+    "RP": ["Recruta", "Soldado", "Cabo", "Sargento", "Tenente", "Capitao"]
+}
+DIVISOES = ["ROTAM", "ROCAM", "GATE", "CHOQUE"]
+
+# ============ ANTI ROUBO DE SERVIDOR ============
 @bot.event
 async def on_guild_join(guild):
-    # Pega quem adicionou o bot pelo audit log
-    inviter = None
     async for entry in guild.audit_logs(limit=1, action=discord.AuditLogAction.bot_add):
         inviter = entry.user
-    
-    # Se não foi você que adicionou
-    if not inviter or inviter.id != DONO_ID:
-        dono_servidor = guild.owner
-        
-        # 1. XINGA O DONO DO SERVER NO PV
+    if not inviter or inviter.id!= DONO_ID:
         try:
-            embed = discord.Embed(title="🚨 BOT PRIVADO", 
-            description=f"Eai otario\nEsse bot é PRIVADO e só meu dono pode adicionar.\nServidor: **{guild.name}**\nQuem tentou: {inviter.mention if inviter else 'Desconhecido'}\n\nTira esse bot daqui antes que eu te denuncie", 
-            color=0xFF0000)
-            await dono_servidor.send(embed=embed)
+            await guild.owner.send(f"🚨 BOT PRIVADO\nSeu merda, esse bot é só do meu dono {DONO_ID}\nServidor: **{guild.name}**\nTira esse bot daqui")
         except: pass
-        
-        # 2. XINGA QUEM ADICIONOU NO PV TAMBÉM
-        if inviter and inviter.id != dono_servidor.id:
-            try:
-                await inviter.send(f"Seu rato, tira esse bot do servidor {guild.name} agora. Ele é só do meu dono {DONO_ID}")
-            except: pass
-        
-        # 3. SAI DO SERVIDOR NA HORA
         await guild.leave()
-        
-        # 4. AVISA VOCÊ
         dono = await bot.fetch_user(DONO_ID)
-        await dono.send(f"🚨 **ANTI ROUBO**\nTentaram adicionar o bot no server: **{guild.name}**\nDono: {dono_servidor}\nQuem adicionou: {inviter}\nJá saí e xinguei os 2")
+        await dono.send(f"🚨 **ANTI ROUBO**\nTentaram add no: **{guild.name}**\nJá saí e xinguei")
 
-# ============ COMANDO PRA LIBERAR NOVO SERVIDOR ============
 @bot.command()
 @is_dono()
 async def liberar(ctx):
-    """Libera esse servidor pra usar o bot"""
     if ctx.guild.id not in db["servidores_permitidos"]:
         db["servidores_permitidos"].append(ctx.guild.id)
         save()
-        await ctx.send(f"✅ Servidor **{ctx.guild.name}** liberado pra usar o bot")
-    else:
-        await ctx.send("✅ Esse servidor já está liberado")
-
-@bot.command()
-@is_dono()
-async def desliberar(ctx):
-    """Remove esse servidor da lista"""
-    if ctx.guild.id in db["servidores_permitidos"]:
-        db["servidores_permitidos"].remove(ctx.guild.id)
-        save()
-        await ctx.send(f"❌ Servidor removido")
-        await ctx.guild.leave()
+        await ctx.send(f"✅ Servidor **{ctx.guild.name}** liberado")
 
 @bot.check
 async def check_servidor(ctx):
-    # Bloqueia comandos se não for servidor liberado
-    if ctx.guild.id not in db["servidores_permitidos"] and ctx.author.id != DONO_ID:
+    if ctx.guild.id not in db["servidores_permitidos"] and ctx.author.id!= DONO_ID:
         return False
     return True
 
-# ============ TICKET COM ASSUMIR ============
+# ============ SETUP CORP ============
+@bot.command()
+@is_dono()
+async def setup(ctx, corp: str = "PM"):
+    try:
+        corp = corp.upper()
+        if corp not in TEMPLATES:
+            return await ctx.send("❌ Orgs: PM, PC, BOPE, RP")
+        
+        msg = await ctx.send(f"⚡ **INICIANDO SETUP DA {corp}**... Aguarde 1 min")
+        guild = ctx.guild
+
+        cargos_list = ["👑 Alto Comando", "DEV", "Equipe Staff", "Civil", "Staff", "Moderador", "Admin", "Mutado"]
+        for patente in TEMPLATES[corp]:
+            cargos_list.append(f"{patente} {corp}")
+        for div in DIVISOES:
+            cargos_list.append(f"{div} {corp}")
+
+        roles = {}
+        for nome in cargos_list:
+            role = discord.utils.get(guild.roles, name=nome)
+            if not role:
+                role = await guild.create_role(name=nome)
+                await asyncio.sleep(0.6) # Anti 429
+            roles[nome] = role
+
+        categoria = discord.utils.get(guild.categories, name=f"🏛️ {corp}")
+        if not categoria: categoria = await guild.create_category(f"🏛️ {corp}")
+
+        await msg.edit(content=f"✅ **SETUP DA {corp} CONCLUÍDO!** {len(cargos_list)} cargos criados")
+    except Exception as e:
+        await ctx.send(f"❌ ERRO NO SETUP: {e}")
+
+# ============ PAINEIS ============
+@bot.command()
+@is_dono()
+async def paineldono(ctx):
+    embed = discord.Embed(title="👑 Painel do Dono", description="Controle total", color=0xFFD700)
+    await ctx.author.send(embed=embed)
+    await ctx.send("✅ Te mandei o painel no PV")
+
+@bot.command()
+async def painelstaff(ctx):
+    if STAFF_ROLE_ID not in [r.id for r in ctx.author.roles]:
+        return await ctx.send("❌ Você não tem permissão. Só quem tem `Equipe Staff` pode usar.")
+    embed = discord.Embed(title="🛡️ Painel Staff", description="Painel da equipe", color=0x00FF00)
+    await ctx.author.send(embed=embed)
+    await ctx.send("✅ Te mandei o painel no PV")
+
+# ============ TICKET ============
 class PainelTicket(View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -130,7 +152,7 @@ async def abrir_ticket(interaction, tipo):
     canal = await guild.create_text_channel(f"{tipo.lower()}-{user.name}", category=categoria, overwrites=overwrites)
     db["tickets"][str(user.id)] = {"canal": canal.id, "staff": None}
     save()
-    embed = discord.Embed(title=f"🎫 Ticket {tipo}", description=f"Olá {user.mention}\nAguarde um staff assumir seu ticket.", color=0x5865F2)
+    embed = discord.Embed(title=f"🎫 Ticket {tipo}", description=f"Olá {user.mention}\nAguarde um staff assumir.", color=0x5865F2)
     await canal.send(embed=embed, view=BotoesTicket(user.id))
     await interaction.response.send_message(f"✅ Ticket criado: {canal.mention}", ephemeral=True)
 
@@ -153,7 +175,7 @@ async def assumir_ticket(interaction, dono_id):
     await interaction.response.send_message("✅ Assumido!", ephemeral=True)
 
 async def fechar_ticket(interaction, dono_id):
-    if STAFF_ROLE_ID not in [r.id for r in interaction.user.roles] and interaction.user.id != dono_id:
+    if STAFF_ROLE_ID not in [r.id for r in interaction.user.roles] and interaction.user.id!= dono_id:
         return await interaction.response.send_message("❌ Sem permissão", ephemeral=True)
     if str(dono_id) in db["tickets"]:
         del db["tickets"][str(dono_id)]
@@ -165,13 +187,21 @@ async def fechar_ticket(interaction, dono_id):
 @bot.command()
 @is_dono()
 async def painel(ctx):
-    embed = discord.Embed(title="🏠 Painel Principal", description="Abra um ticket para atendimento", color=0x5865F2)
+    embed = discord.Embed(title="🏠 Painel Principal", description="Abra um ticket", color=0x5865F2)
     await ctx.send(embed=embed, view=PainelTicket())
     await ctx.message.delete()
+
+@bot.command()
+@is_dono()
+async def setstaff(ctx, membro: discord.Member, *, cargo_nome):
+    cargo = discord.utils.get(ctx.guild.roles, name=cargo_nome)
+    if not cargo: cargo = await ctx.guild.create_role(name=cargo_nome)
+    await membro.add_roles(cargo)
+    await ctx.send(f"✅ {membro.mention} recebeu o cargo `{cargo_nome}`")
 
 @bot.event
 async def on_ready():
     bot.add_view(PainelTicket())
-    print(f'✅ BOT ONLINE V10 - SÓ DONO PODE ADICIONAR')
+    print(f'✅ BOT ONLINE V10.1 PRONTO')
 
 bot.run(os.getenv("TOKEN"))
