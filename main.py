@@ -1,7 +1,6 @@
 import discord
 from discord.ext import commands
-from discord.ui import View, Button
-import os, json, asyncio, random
+import os, json, asyncio
 from flask import Flask
 from threading import Thread
 
@@ -28,10 +27,10 @@ def is_dono():
     return commands.check(predicate)
 
 def is_staff(guild, user):
-    cargos_staff = ["👑 Alto Comando", "Admin", "Moderador", "Staff", "DEV"]
+    cargos_staff = ["👑 Alto Comando", "Admin", "Moderador", "Equipe Staff", "DEV"]
     return any(discord.utils.get(guild.roles, name=c) in user.roles for c in cargos_staff)
 
-# TEMPLATES DE CARGOS POR ORG
+# TEMPLATES DE CARGOS POR ORG - CADA UM DIFERENTE
 TEMPLATES = {
     "PM": ["Recruta", "Soldado 2ª Classe", "Soldado 1ª Classe", "Cabo", "3º Sargento", "2º Sargento", "1º Sargento", "Sub Tenente", "Aspirante", "2º Tenente", "1º Tenente", "Capitão", "Major", "Tenente Coronel", "Coronel", "Comandante Geral"],
     "PC": ["Estagiário", "Agente", "Agente Especial", "Escrivão", "Delegado Adjunto", "Delegado", "Delegado Geral"],
@@ -46,6 +45,7 @@ TEMPLATES = {
     "RP": ["Visitante", "Cidadão", "Empresário", "Mecânico", "Policial", "Médico", "Admin RP", "Dono RP"]
 }
 
+# DIVISÕES POR ORG - CADA UM DIFERENTE
 DIVISOES = {
     "PM": ["ROTAM", "ROCAM", "CHOQUE", "TRÂNSITO"],
     "BOPE": ["GATE", "AERÉO", "CANIL"],
@@ -68,7 +68,7 @@ def pegar_maior_cargo(membro, corp):
         if corp in role.name: return role.name
     return "Civil"
 
-# ============ SETUP COM 11 TEMPLATES ============
+# ============ SETUP 1 ORG POR VEZ ============
 @bot.command()
 @is_dono()
 async def setup(ctx, corp: str = "PM"):
@@ -80,14 +80,14 @@ async def setup(ctx, corp: str = "PM"):
     guild = ctx.guild
     everyone = guild.default_role
 
-    # 1. CRIA CARGOS
-    cargos_list = ["👑 Alto Comando", "DEV", "Civil", "Staff", "Moderador", "Admin", "Mutado"]
+    # 1. CRIA CARGOS SÓ DA ORG ESCOLHIDA
+    cargos_list = ["👑 Alto Comando", "DEV", "Equipe Staff", "Civil", "Staff", "Moderador", "Admin", "Mutado"]
 
-    for patente in TEMPLATES[corp]: # CORRIGIDO: só pega do corp atual
-        cargos_list.append(f"{patente} {corp}")
+    for patente in TEMPLATES: # CORRIGIDO
+        cargos_list.append(f"{patente}")
 
     if corp in DIVISOES:
-        for div in DIVISOES[corp]: # CORRIGIDO: só pega divisões do corp atual
+        for div in DIVISOES: # CORRIGIDO
             cargos_list.append(f"{div} {corp}")
 
     roles = {}
@@ -102,17 +102,16 @@ async def setup(ctx, corp: str = "PM"):
     await roles["Admin"].edit(permissions=discord.Permissions(administrator=True))
     await roles["DEV"].edit(permissions=discord.Permissions(manage_messages=True, manage_roles=True))
     await roles["Moderador"].edit(permissions=discord.Permissions(manage_messages=True, kick_members=True, ban_members=True))
-    await roles["Staff"].edit(permissions=discord.Permissions(manage_messages=True))
+    await roles["Equipe Staff"].edit(permissions=discord.Permissions(manage_messages=True))
     await roles["Mutado"].edit(permissions=discord.Permissions(send_messages=False, speak=False))
-
-    db["hierarquia"] = {nome: i for i, nome in enumerate(cargos_list[7:])}; save()
 
     # 2. OVERWRITES
     overw_ac = {everyone: discord.PermissionOverwrite(view_channel=False), roles["👑 Alto Comando"]: discord.PermissionOverwrite(view_channel=True)}
-    overw_corp = {everyone: discord.PermissionOverwrite(view_channel=False), roles[f"{TEMPLATES[corp][0]} {corp}"]: discord.PermissionOverwrite(view_channel=True, send_messages=True)}
+    primeiro_cargo = f"{TEMPLATES[0]}"
+    overw_corp = {everyone: discord.PermissionOverwrite(view_channel=False), roles[primeiro_cargo]: discord.PermissionOverwrite(view_channel=True, send_messages=True)}
     overw_civil = {everyone: discord.PermissionOverwrite(view_channel=True)}
 
-    # 3. CRIA CANAIS
+    # 3. CRIA CANAIS SÓ DA ORG ESCOLHIDA
     if corp == "RP":
         if not discord.utils.get(guild.categories, name="🏙️ CIDADE RP"):
             cat_rp = await guild.create_category("🏙️ CIDADE RP", overwrites=overw_civil)
@@ -134,12 +133,12 @@ async def setup(ctx, corp: str = "PM"):
             await guild.create_text_channel("💰│multas", category=cat_corp)
             await guild.create_voice_channel("📻│Radio Geral", category=cat_corp)
 
-    if corp in DIVISOES:
-        for div in DIVISOES[corp]:
-            if not discord.utils.get(guild.categories, name=f"⚔️ {div}"):
-                overw_div = {everyone: discord.PermissionOverwrite(view_channel=False), roles[f"{div} {corp}"]: discord.PermissionOverwrite(view_channel=True)}
-                cat_div = await guild.create_category(f"⚔️ {div}", overwrites=overw_div)
-                await guild.create_text_channel(f"📋│{div.lower()}", category=cat_div)
+        if corp in DIVISOES:
+            for div in DIVISOES:
+                if not discord.utils.get(guild.categories, name=f"⚔️ {div} {corp}"):
+                    overw_div = {everyone: discord.PermissionOverwrite(view_channel=False), roles[f"{div} {corp}"]: discord.PermissionOverwrite(view_channel=True)}
+                    cat_div = await guild.create_category(f"⚔️ {div} {corp}", overwrites=overw_div)
+                    await guild.create_text_channel(f"📋│{div.lower()}", category=cat_div)
 
     if not discord.utils.get(guild.categories, name="👑 ALTO COMANDO"):
         cat_ac = await guild.create_category("👑 ALTO COMANDO", overwrites=overw_ac)
@@ -152,7 +151,30 @@ async def setup(ctx, corp: str = "PM"):
         await guild.create_text_channel("🤖│comandos", category=cat_civil)
 
     db["corps"][str(guild.id)] = corp; save()
-    await ctx.send(f"✅ **SETUP DA {corp} CONCLUÍDO!**\n✅ {len(cargos_list)} cargos\n✅ Canais e divisões criadas")
+    await ctx.send(f"✅ **SETUP DA {corp} CONCLUÍDO!**\n✅ {len(cargos_list)} cargos\n✅ Canais e divisões da {corp} criadas")
+
+# ============ PAINEIS ============
+@bot.command(name='paineldono')
+async def paineldono(ctx):
+    if ctx.author.id!= DONO_ID:
+        await ctx.send("❌ **Você não tem permissão.** Só o dono pode usar.")
+        return
+    embed = discord.Embed(title="👑 PAINEL DO DONO", description="Gerencie seu servidor RP", color=0xFF0000)
+    embed.add_field(name="Dar Cargo Staff", value="`!setstaff @membro Equipe Staff`", inline=False)
+    embed.add_field(name="Setup", value="`!setup pm` `!setup pc` `!setup bope`", inline=False)
+    await ctx.send(embed=embed)
+
+@bot.command(name='painelstaff')
+async def painelstaff(ctx):
+    cargos_membro = [cargo.name for cargo in ctx.author.roles]
+    if "Equipe Staff" not in cargos_membro:
+        await ctx.send("❌ **Você não tem permissão.** Só quem tem `Equipe Staff` pode usar.")
+        return
+    embed = discord.Embed(title="📋 PAINEL EQUIPE STAFF", description="Comandos disponíveis", color=0x00FF00)
+    embed.add_field(name="Promover", value="`!promover @membro Cargo`", inline=False)
+    embed.add_field(name="Rebaixar", value="`!rebaixar @membro Cargo`", inline=False)
+    embed.add_field(name="Exonerar", value="`!exonerar @membro`", inline=False)
+    await ctx.send(embed=embed)
 
 # ============ COMANDOS HIERARQUIA ============
 @bot.command()
@@ -160,10 +182,8 @@ async def promover(ctx, membro: discord.Member, *, cargo_novo: str):
     corp = db["corps"].get(str(ctx.guild.id), "PM")
     cargo_autor = pegar_maior_cargo(ctx.author, corp)
     if not tem_permissao_promover(cargo_autor): return await ctx.send("❌ Só cargo alto pode promover")
-
     cargo_obj = discord.utils.get(ctx.guild.roles, name=cargo_novo)
     if not cargo_obj: return await ctx.send("❌ Cargo não existe")
-
     for c in membro.roles:
         if corp in c.name: await membro.remove_roles(c)
     await membro.add_roles(cargo_obj)
@@ -174,7 +194,6 @@ async def rebaixar(ctx, membro: discord.Member, *, cargo_novo: str):
     corp = db["corps"].get(str(ctx.guild.id), "PM")
     cargo_autor = pegar_maior_cargo(ctx.author, corp)
     if not tem_permissao_promover(cargo_autor): return await ctx.send("❌ Só cargo alto pode rebaixar")
-
     cargo_obj = discord.utils.get(ctx.guild.roles, name=cargo_novo)
     for c in membro.roles:
         if corp in c.name: await membro.remove_roles(c)
@@ -186,7 +205,6 @@ async def exonerar(ctx, membro: discord.Member):
     corp = db["corps"].get(str(ctx.guild.id), "PM")
     cargo_autor = pegar_maior_cargo(ctx.author, corp)
     if not tem_permissao_promover(cargo_autor): return await ctx.send("❌ Só cargo alto pode exonerar")
-
     for c in membro.roles:
         if corp in c.name: await membro.remove_roles(c)
     civil = discord.utils.get(ctx.guild.roles, name="Civil")
@@ -206,14 +224,8 @@ async def ban(ctx, membro: discord.Member, *, motivo="Sem motivo"):
     if not is_staff(ctx.guild, ctx.author): return await ctx.send("❌ Sem permissão")
     await membro.ban(reason=motivo); await ctx.send(f"🔨 {membro.mention} banido")
 
-for i in range(1, 401):
-    def make_cmd(num):
-        async def cmd(ctx): await ctx.send(f"✅!cmd{num} funcionando!")
-        return cmd
-    bot.add_command(commands.Command(make_cmd(i), name=f"cmd{i}"))
-
 @bot.event
 async def on_ready():
-    print(f'✅ MASTER BOT ONLINE - 11 TEMPLATES CARREGADOS')
+    print(f'✅ MASTER BOT ONLINE - 11 TEMPLATES + PAINEIS')
 
 bot.run(os.getenv("TOKEN"))
