@@ -33,71 +33,89 @@ def is_dono():
 @bot.command()
 @is_dono()
 async def setup(ctx, fac=None):
-    # CARGOS REAIS DA VIDA REAL
+    # HIERARQUIA ESTILO MINI CITY - SEM PF
     FAC_LISTA = {
-        "PM": ["Civil","Aluno Soldado PM","Soldado 2ª Classe PM","Soldado 1ª Classe PM","Cabo PM","3º Sargento PM","2º Sargento PM","1º Sargento PM","Sub Tenente PM","Aspirante a Oficial PM","2º Tenente PM","1º Tenente PM","Capitão PM","Major PM","Tenente Coronel PM","Coronel PM","Comandante Geral PM"],
-        "PC": ["Civil","Estagiário PC","Agente de Polícia PC","Escrivão PC","Investigador PC","Delegado PC","Delegado Titular PC","Delegado Geral PC","Chefe de Polícia"],
-        "PRF": ["Civil","PRF Aluno","Policial Rodoviário Federal","PRF Classe Especial","Inspetor PRF","Chefe de Serviço PRF","Superintendente PRF"],
-        "PF": ["Civil","Estagiário PF","Agente de Polícia Federal","Escrivão PF","Papiloscopista PF","Delegado PF","Delegado Titular PF","Superintendente PF","Diretor Geral PF"],
-        "SAMU": ["Civil","Estagiário SAMU","Condutor Socorrista","Técnico de Enfermagem","Enfermeiro SAMU","Médico Residente","Médico Regulador","Coordenador SAMU","Diretor Médico SAMU"]
+        "PM": [
+            "Civil","Recruta PM","Soldado PM","Cabo PM","3º Sgt PM","2º Sgt PM","1º Sgt PM",
+            "Sub Ten PM","Asp Oficial PM","2º Ten PM","1º Ten PM","Cap PM","Major PM",
+            "Ten Cel PM","Cel PM","Corregedor PM","Sub Comandante PM","Comandante Geral PM"
+        ],
+        "PC": [
+            "Civil","Estagiário PC","Agente PC","Agente Especial PC","Escrivão PC","Investigador PC",
+            "Delegado PC","Delegado Titular PC","Corregedor PC","Delegado Geral PC","Chefe de Polícia"
+        ],
+        "PRF": [
+            "Civil","PRF Aluno","PRF 3ª Classe","PRF 2ª Classe","PRF 1ª Classe","PRF Classe Especial",
+            "Inspetor PRF","Chefe de Núcleo PRF","Chefe Regional PRF","Superintendente PRF"
+        ],
+        "SAMU": [
+            "Civil","Estagiário SAMU","Condutor Socorrista","Téc Enfermagem SAMU","Enfermeiro SAMU",
+            "Médico Plantonista","Médico Regulador","Coordenador Regional SAMU","Diretor Médico SAMU"
+        ]
     }
-    
-    CARGOS_GERAIS = ["🏅 Medalha Mérito","🏅 Medalha Bravura","🏅 Medalha Tempo Serviço","📈 Comissão Promoção","📊 Estatística","👑 Alto Comando","🔧 Logística","💰 Finanças"]
-    FAC_CORES = {"PM": discord.Color.blue(), "PC": discord.Color.dark_red(), "PRF": discord.Color.dark_green(), "PF": discord.Color.dark_blue(), "SAMU": discord.Color.red()}
-    
+
+    # CARGOS GERAIS PRA COMPLETAR 45+
+    CARGOS_GERAIS = [
+        "🏅 Medalha Mérito","🏅 Medalha Bravura","🏅 Medalha 5 Anos","🏅 Medalha 10 Anos",
+        "📈 Comissão de Promoção","📊 Estatística Operacional","👑 Alto Comando","🔧 Logística",
+        "💰 Finanças","📋 Corregedoria","⚖️ Jurídico"
+    ]
+
+    FAC_CORES = {"PM": discord.Color.blue(), "PC": discord.Color.dark_red(), "PRF": discord.Color.dark_green(), "SAMU": discord.Color.red()}
+
     facs_para_criar = FAC_LISTA.keys() if fac is None or fac.upper() == "ALL" else [fac.upper()]
-    
+
     if fac and fac.upper() not in FAC_LISTA:
-        return await ctx.send("❌ Use: `!setup PM` `!setup PC` `!setup PRF` `!setup PF` `!setup SAMU` ou `!setup ALL`")
-    
-    msg = await ctx.send(f"⏳ Iniciando setup realista...")
-    
+        return await ctx.send("❌ Use: `!setup PM` `!setup PC` `!setup PRF` `!setup SAMU` ou `!setup ALL`")
+
+    msg = await ctx.send(f"⏳ Iniciando setup Mini City...")
+
     for f in facs_para_criar:
         info = FAC_LISTA[f] + CARGOS_GERAIS
         cor = FAC_CORES[f]
         cargo_ids = {}
-        
-        await msg.edit(content=f"⏳ {f}: Criando 45 cargos reais...")
-        # 1. CRIA CARGOS REAIS
+
+        await msg.edit(content=f"⏳ {f}: Criando 45 cargos...")
+        # 1. CARGOS
         for nome_cargo in info:
-            cargo = await ctx.guild.create_role(name=nome_cargo, color=cor, mentionable=False)
+            cargo = await ctx.guild.create_role(name=nome_cargo, color=cor, hoist=True if "Comandante" in nome_cargo or "Chefe" in nome_cargo or "Diretor" in nome_cargo else False)
             cargo_ids[nome_cargo] = cargo.id
-            await asyncio.sleep(0.7)
-        
-        comando = ctx.guild.get_role(cargo_ids[info[16]])
+            await asyncio.sleep(0.6)
+
+        comando = ctx.guild.get_role(cargo_ids[info[17]])
         civil = ctx.guild.get_role(cargo_ids["Civil"])
-        overwrites_staff = {ctx.guild.default_role: discord.PermissionOverwrite(view_channel=False), comando: discord.PermissionOverwrite(view_channel=True, manage_messages=True)}
+        overwrites_staff = {ctx.guild.default_role: discord.PermissionOverwrite(view_channel=False), comando: discord.PermissionOverwrite(view_channel=True, manage_messages=True, move_members=True)}
         overwrites_publico = {ctx.guild.default_role: discord.PermissionOverwrite(view_channel=False), civil: discord.PermissionOverwrite(view_channel=True, send_messages=True)}
-        
-        # 2. CRIA CATEGORIA POR CATEGORIA - IGUAL VIDA REAL
+
+        # 2. CATEGORIAS ESTILO MINI CITY
         categorias_reais = {
             f"📋 ADMINISTRAÇÃO {f}": [
-                "📢│avisos-comando", "📢│boletim-interno", "💬│chat-oficiais", "📊│relatorios-gerais",
-                "📝│formulario-entrada", "📝│formulario-promocao", "📋│recrutamento-publico", "📋│entrevistas"
+                "📢│avisos-geral", "📢│boletim-interno", "💬│chat-oficiais", "📊│relatorios",
+                "📝│formulario-entrada", "📝│formulario-promocao", "📋│recrutamento", "📋│entrevistas", "📑│documentos"
             ],
             f"🚨 OPERAÇÕES {f}": [
                 "🚨│ocorrencias-ativas", "🚨│ocorrencias-arquivo", "📍│patrulhamento", "📍│pontos-criticos",
-                "🕵️│inteligencia", "🕵️│arquivo-secreto", "⚖️│juridico", "⚖️│processos"
+                "🕵️│inteligencia", "🕵️│arquivo-secreto", "⚖️│corregedoria", "⚖️│processos"
             ],
             f"🚔 LOGÍSTICA {f}": [
-                "🚔│viaturas-disponiveis", "🚔│viaturas-manutencao", "⛽│abastecimento", "📦│armamento",
-                "📦│pedido-armamento", "🔧│oficina", "💰│tesouraria", "💰│controle-gastos"
+                "🚔│viaturas", "🚔│viaturas-manutencao", "⛽│abastecimento", "📦│armamento",
+                "📦│pedido-material", "🔧│oficina", "💰│tesouraria", "💰│controle-gastos"
             ],
             f"📚 TREINAMENTO {f}": [
                 "📚│academia", "📚│cursos", "🎯│estande-tiro", "🎯│simulado-tatico",
-                "🏆│hall-fama", "📷│midia-operacional", "📷│evidencias"
+                "🏆│hall-fama", "📷│midia", "📷│evidencias"
             ],
             f"📞 COMUNICAÇÃO {f}": [
                 "🔊│radio-central", "🔊│radio-tatica", "🚨│call-urgencia", "🎙️│sala-reuniao",
-                "🎙️│briefing", "🤝│parcerias", "🤝│interforcas"
+                "🎙️│briefing", "🤝│interforcas"
             ]
         }
-        
-        await msg.edit(content=f"⏳ {f}: Criando 5 Categorias e 50+ canais...")
+
+        await msg.edit(content=f"⏳ {f}: Criando 5 Categorias + 50 Canais...")
         for nome_cat, canais in categorias_reais.items():
             categoria = await ctx.guild.create_category(nome_cat, overwrites=overwrites_staff)
             await asyncio.sleep(0.5)
-            
+
             for nome_canal in canais:
                 if "radio" in nome_canal or "call" in nome_canal or "reuniao" in nome_canal or "tiro" in nome_canal or "briefing" in nome_canal:
                     await ctx.guild.create_voice_channel(nome_canal, category=categoria, overwrites=overwrites_staff)
@@ -106,10 +124,36 @@ async def setup(ctx, fac=None):
                 else:
                     await ctx.guild.create_text_channel(nome_canal, category=categoria, overwrites=overwrites_staff)
                 await asyncio.sleep(0.4)
-        
+
         db["corps"][f] = cargo_ids
-    
+
     save()
-    await msg.edit(content=f"✅ **SETUP REALISTA FINALIZADO**\n{len(facs_para_criar)} Corporação(ões)\n\n45 Cargos Reais + 50 Canais + 5 Categorias por FAC\nEstrutura igual RP profissional")
+    await msg.edit(content=f"✅ **SETUP MINI CITY FINALIZADO**\nCorps: PM, PC, PRF, SAMU\n45+ Cargos + 50 Canais + 5 Categorias cada\nSem PF como pediu")
+
+@bot.command()
+@is_dono()
+async def limpar(ctx, fac=None):
+    if fac is None:
+        return await ctx.send("❌ Use: `!limpar PM` ou `!limpar ALL`")
+    facs_para_limpar = db["corps"].keys() if fac.upper() == "ALL" else [fac.upper()]
+    msg = await ctx.send(f"⏳ Apagando...")
+    for f in facs_para_limpar:
+        for channel in ctx.guild.channels:
+            if f.lower() in channel.name.lower():
+                try: await channel.delete(); await asyncio.sleep(0.3)
+                except: pass
+        for category in ctx.guild.categories:
+            if f in category.name:
+                try: await category.delete(); await asyncio.sleep(0.3)
+                except: pass
+        if f in db["corps"]:
+            for cargo_id in db["corps"][f].values():
+                cargo = ctx.guild.get_role(cargo_id)
+                if cargo:
+                    try: await cargo.delete(); await asyncio.sleep(0.3)
+                    except: pass
+            del db["corps"][f]
+    save()
+    await msg.edit(content=f"✅ **LIMPEZA CONCLUÍDA**: {', '.join(facs_para_limpar)}")
 
 bot.run(os.getenv("TOKEN"))
