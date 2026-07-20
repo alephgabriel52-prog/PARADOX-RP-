@@ -33,16 +33,16 @@ def is_dono():
 @bot.command()
 @is_dono()
 async def setup(ctx, fac=None):
+    # CARGOS REAIS DA VIDA REAL
     FAC_LISTA = {
-        "PM": ["Civil","Recruta PM","Soldado 2ª PM","Soldado 1ª PM","Cabo PM","3º Sargento PM","2º Sargento PM","1º Sargento PM","Sub Tenente PM","Aspirante PM","2º Tenente PM","1º Tenente PM","Capitão PM","Major PM","Tenente Coronel PM","Coronel PM","Comandante Geral PM"],
-        "PC": ["Civil","Estagiário PC","Agente PC Classe 3","Agente PC Classe 2","Agente PC Classe 1","Inspetor PC","Delegado PC","Delegado PC Especial","Delegado Geral PC","Chefe PC"],
-        "PRF": ["Civil","PRF Aluno","PRF 3ª Classe","PRF 2ª Classe","PRF 1ª Classe","PRF Classe Especial","Inspetor PRF","Chefe PRF","Superintendente PRF"],
-        "PF": ["Civil","Estagiário PF","Agente PF","Escrivão PF","Papiloscopista PF","Delegado PF","Delegado PF Especial","Superintendente PF","Diretor Geral PF"],
-        "SAMU": ["Civil","Estagiário SAMU","Condutor SAMU","Téc. Enfermagem SAMU","Enfermeiro SAMU","Médico Residente","Médico SAMU","Coordenador SAMU","Diretor SAMU"]
+        "PM": ["Civil","Aluno Soldado PM","Soldado 2ª Classe PM","Soldado 1ª Classe PM","Cabo PM","3º Sargento PM","2º Sargento PM","1º Sargento PM","Sub Tenente PM","Aspirante a Oficial PM","2º Tenente PM","1º Tenente PM","Capitão PM","Major PM","Tenente Coronel PM","Coronel PM","Comandante Geral PM"],
+        "PC": ["Civil","Estagiário PC","Agente de Polícia PC","Escrivão PC","Investigador PC","Delegado PC","Delegado Titular PC","Delegado Geral PC","Chefe de Polícia"],
+        "PRF": ["Civil","PRF Aluno","Policial Rodoviário Federal","PRF Classe Especial","Inspetor PRF","Chefe de Serviço PRF","Superintendente PRF"],
+        "PF": ["Civil","Estagiário PF","Agente de Polícia Federal","Escrivão PF","Papiloscopista PF","Delegado PF","Delegado Titular PF","Superintendente PF","Diretor Geral PF"],
+        "SAMU": ["Civil","Estagiário SAMU","Condutor Socorrista","Técnico de Enfermagem","Enfermeiro SAMU","Médico Residente","Médico Regulador","Coordenador SAMU","Diretor Médico SAMU"]
     }
     
-    # + CARGOS GERAIS PRA BATER 45
-    CARGOS_EXTRAS = ["🏅 Medalha Destaque","🏅 Medalha Bravura","📈 Promoção Mês","📊 Estatísticas","👑 Comando","🔧 Logística","💰 Tesouraria"]
+    CARGOS_GERAIS = ["🏅 Medalha Mérito","🏅 Medalha Bravura","🏅 Medalha Tempo Serviço","📈 Comissão Promoção","📊 Estatística","👑 Alto Comando","🔧 Logística","💰 Finanças"]
     FAC_CORES = {"PM": discord.Color.blue(), "PC": discord.Color.dark_red(), "PRF": discord.Color.dark_green(), "PF": discord.Color.dark_blue(), "SAMU": discord.Color.red()}
     
     facs_para_criar = FAC_LISTA.keys() if fac is None or fac.upper() == "ALL" else [fac.upper()]
@@ -50,62 +50,66 @@ async def setup(ctx, fac=None):
     if fac and fac.upper() not in FAC_LISTA:
         return await ctx.send("❌ Use: `!setup PM` `!setup PC` `!setup PRF` `!setup PF` `!setup SAMU` ou `!setup ALL`")
     
-    msg = await ctx.send(f"⏳ Criando {len(facs_para_criar)} corporação(ões)... Isso vai demorar 3-5min")
+    msg = await ctx.send(f"⏳ Iniciando setup realista...")
     
     for f in facs_para_criar:
-        info = FAC_LISTA[f] + CARGOS_EXTRAS
+        info = FAC_LISTA[f] + CARGOS_GERAIS
         cor = FAC_CORES[f]
         cargo_ids = {}
         
-        await msg.edit(content=f"⏳ Criando cargos da {f}... 45 cargos")
-        # 1. CRIA 45 CARGOS
+        await msg.edit(content=f"⏳ {f}: Criando 45 cargos reais...")
+        # 1. CRIA CARGOS REAIS
         for nome_cargo in info:
-            cargo = await ctx.guild.create_role(name=nome_cargo, color=cor)
+            cargo = await ctx.guild.create_role(name=nome_cargo, color=cor, mentionable=False)
             cargo_ids[nome_cargo] = cargo.id
-            await asyncio.sleep(0.6)
+            await asyncio.sleep(0.7)
         
-        # 2. PERMISSÕES
         comando = ctx.guild.get_role(cargo_ids[info[16]])
         civil = ctx.guild.get_role(cargo_ids["Civil"])
-        overwrites_staff = {ctx.guild.default_role: discord.PermissionOverwrite(view_channel=False), comando: discord.PermissionOverwrite(view_channel=True, manage_channels=True)}
-        overwrites_civil = {ctx.guild.default_role: discord.PermissionOverwrite(view_channel=False), civil: discord.PermissionOverwrite(view_channel=True, send_messages=True)}
+        overwrites_staff = {ctx.guild.default_role: discord.PermissionOverwrite(view_channel=False), comando: discord.PermissionOverwrite(view_channel=True, manage_messages=True)}
+        overwrites_publico = {ctx.guild.default_role: discord.PermissionOverwrite(view_channel=False), civil: discord.PermissionOverwrite(view_channel=True, send_messages=True)}
         
-        await msg.edit(content=f"⏳ Criando canais da {f}... 50+ canais")
-        # 3. CATEGORIA
-        categoria = await ctx.guild.create_category(f"🚨 {f}", overwrites=overwrites_staff)
+        # 2. CRIA CATEGORIA POR CATEGORIA - IGUAL VIDA REAL
+        categorias_reais = {
+            f"📋 ADMINISTRAÇÃO {f}": [
+                "📢│avisos-comando", "📢│boletim-interno", "💬│chat-oficiais", "📊│relatorios-gerais",
+                "📝│formulario-entrada", "📝│formulario-promocao", "📋│recrutamento-publico", "📋│entrevistas"
+            ],
+            f"🚨 OPERAÇÕES {f}": [
+                "🚨│ocorrencias-ativas", "🚨│ocorrencias-arquivo", "📍│patrulhamento", "📍│pontos-criticos",
+                "🕵️│inteligencia", "🕵️│arquivo-secreto", "⚖️│juridico", "⚖️│processos"
+            ],
+            f"🚔 LOGÍSTICA {f}": [
+                "🚔│viaturas-disponiveis", "🚔│viaturas-manutencao", "⛽│abastecimento", "📦│armamento",
+                "📦│pedido-armamento", "🔧│oficina", "💰│tesouraria", "💰│controle-gastos"
+            ],
+            f"📚 TREINAMENTO {f}": [
+                "📚│academia", "📚│cursos", "🎯│estande-tiro", "🎯│simulado-tatico",
+                "🏆│hall-fama", "📷│midia-operacional", "📷│evidencias"
+            ],
+            f"📞 COMUNICAÇÃO {f}": [
+                "🔊│radio-central", "🔊│radio-tatica", "🚨│call-urgencia", "🎙️│sala-reuniao",
+                "🎙️│briefing", "🤝│parcerias", "🤝│interforcas"
+            ]
+        }
         
-        # 4. CRIA 50+ CANAIS
-        canais = [
-            # GERAL
-            "📢│avisos-geral","📢│avisos-comando","💬│chat-geral","💬│chat-comando","📊│relatorios",
-            # ADMIN
-            "📝│formulario-entrada","📝│formulario-promocao","📋│recrutamento","📋│entrevistas","📑│documentos",
-            # OPERACIONAL
-            "🚨│ocorrencias-ativas","🚨│ocorrencias-arquivo","🚔│viaturas","🚔│viaturas-manutencao","📦│armamento","📦│armamento-pedido",
-            # INTEL
-            "🕵️│intel","🕵️│intel-arquivo","📍│patrulhamento","📍│pontos-quentes",
-            # VOZ
-            "🔊│radio-principal","🔊│radio-tatica","🚨│call-urgencia","🎙️│reuniao-comando","🎙️│reuniao-geral",
-            # TREINAMENTO
-            "📚│treinamento","📚│cursos","🎯│campo-tiro","🎯│simulado",
-            # LOGISTICA
-            "💰│tesouraria","💰│gastos","🔧│logistica","🔧│oficina","⛽│combustivel",
-            # EXTRA
-            "📷│midia","📷│evidencias","⚖️│juridico","⚖️│processos","🤝│parcerias","🏆│hall-fama"
-        ]
-        
-        for nome in canais:
-            if "radio" in nome or "call" in nome or "reuniao" in nome or "tiro" in nome:
-                await ctx.guild.create_voice_channel(nome, category=categoria, overwrites=overwrites_staff)
-            elif "recrutamento" in nome or "entrevistas" in nome:
-                await ctx.guild.create_text_channel(nome, category=categoria, overwrites=overwrites_civil)
-            else:
-                await ctx.guild.create_text_channel(nome, category=categoria, overwrites=overwrites_staff)
-            await asyncio.sleep(0.4)
+        await msg.edit(content=f"⏳ {f}: Criando 5 Categorias e 50+ canais...")
+        for nome_cat, canais in categorias_reais.items():
+            categoria = await ctx.guild.create_category(nome_cat, overwrites=overwrites_staff)
+            await asyncio.sleep(0.5)
+            
+            for nome_canal in canais:
+                if "radio" in nome_canal or "call" in nome_canal or "reuniao" in nome_canal or "tiro" in nome_canal or "briefing" in nome_canal:
+                    await ctx.guild.create_voice_channel(nome_canal, category=categoria, overwrites=overwrites_staff)
+                elif "recrutamento" in nome_canal or "entrevistas" in nome_canal:
+                    await ctx.guild.create_text_channel(nome_canal, category=categoria, overwrites=overwrites_publico)
+                else:
+                    await ctx.guild.create_text_channel(nome_canal, category=categoria, overwrites=overwrites_staff)
+                await asyncio.sleep(0.4)
         
         db["corps"][f] = cargo_ids
     
     save()
-    await msg.edit(content=f"✅ **SETUP MEGA COMPLETO FINALIZADO**\n{len(facs_para_criar)} Corps criadas\n45+ Cargos e 50+ Canais cada\nUse `!setup ALL` pra criar todas de uma vez")
+    await msg.edit(content=f"✅ **SETUP REALISTA FINALIZADO**\n{len(facs_para_criar)} Corporação(ões)\n\n45 Cargos Reais + 50 Canais + 5 Categorias por FAC\nEstrutura igual RP profissional")
 
 bot.run(os.getenv("TOKEN"))
