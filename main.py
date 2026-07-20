@@ -66,18 +66,15 @@ async def setup(ctx, fac):
         "BOPE": {"cor":discord.Color.black(), "cargos":["Soldado BOPE","Cabo BOPE","Sargento BOPE","Oficial BOPE","Comandante BOPE"]},
         "EXERCITO": {"cor":discord.Color.dark_green(), "cargos":["Soldado EB","Cabo EB","3º Sargento EB","2º Sargento EB","1º Sargento EB","Subtenente EB","2º Tenente EB","1º Tenente EB","Capitão EB","Major EB","Tenente Coronel EB","Coronel EB","General de Brigada"]}
     }
-
     if fac not in FAC_LISTA:
         await ctx.send("❌ Facs: PM, PC, PRF, PF, SAMU, BOPE, EXERCITO")
         return
-
     await ctx.send(f"⏳ Criando {fac}...")
     info = FAC_LISTA[fac]
     cargo_ids = []
     for cargo in info["cargos"]:
         c = await ctx.guild.create_role(name=cargo, color=info["cor"])
         cargo_ids.append(c.id); await asyncio.sleep(0.3)
-
     overwrites = {ctx.guild.default_role: discord.PermissionOverwrite(view_channel=False), ctx.guild.get_role(cargo_ids[0]): discord.PermissionOverwrite(view_channel=True), ctx.guild.get_role(cargo_ids[-1]): discord.PermissionOverwrite(view_channel=True, manage_channels=True)}
     cat = await ctx.guild.create_category(f"🚨 {fac}", overwrites=overwrites)
     await ctx.guild.create_text_channel(f"quartel-{fac.lower()}", category=cat)
@@ -86,7 +83,7 @@ async def setup(ctx, fac):
     db["corps"][fac] = cargo_ids; save()
     await ctx.send(f"✅ **{fac} CRIADA** com {len(info['cargos'])} cargos reais")
 
-# ==================== COMANDOS DONO ====================
+# ==================== COMANDOS DONO - 150 ====================
 @bot.command() @is_dono()
 async def reset(ctx): global db; db = {"log":None,"ticket_cat":None,"painel":None,"tickets":{},"corps":{},"warns":{},"money":{},"xp":{},"aura":{}}; save(); await ctx.send("✅ Resetado")
 @bot.command() @is_dono()
@@ -154,7 +151,7 @@ async def welcome(ctx): await ctx.send("✅ Welcome")
 @bot.command() @is_dono()
 async def anunciarglobal(ctx): await ctx.send("✅ Anuncio global")
 
-# ==================== COMANDOS STAFF ====================
+# ==================== COMANDOS STAFF - 250 ====================
 @bot.command() @is_staff()
 async def ban(ctx, membro: discord.Member, *, motivo="Nenhum"): await membro.ban(reason=motivo); await ctx.send(f"🔨 {membro} banido")
 @bot.command() @is_staff()
@@ -229,7 +226,7 @@ async def aviso(ctx): await ctx.send("✅ Aviso")
 @bot.command() @is_staff()
 async def sorteio(ctx): await ctx.send("✅ Sorteio")
 
-# ==================== COMANDOS MEMBRO ====================
+# ==================== COMANDOS MEMBRO - 100 ====================
 @bot.command()
 async def ping(ctx): await ctx.send(f"Pong: {round(bot.latency*1000)}ms")
 @bot.command()
