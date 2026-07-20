@@ -25,11 +25,11 @@ def save():
     with open(ARQUIVO, 'w', encoding='utf-8') as f: json.dump(db, f, ensure_ascii=False, indent=4)
 
 def is_dono():
-    async def predicate(ctx): return ctx.author.id == DONO_ID
+    def predicate(ctx): return ctx.author.id == DONO_ID
     return commands.check(predicate)
 
 def is_staff():
-    async def predicate(ctx):
+    def predicate(ctx):
         if ctx.author.id == DONO_ID: return True
         return ctx.author.guild_permissions.administrator
     return commands.check(predicate)
@@ -49,7 +49,7 @@ class CloseView(View):
     def __init__(self): super().__init__(timeout=None)
     @discord.ui.button(label="Fechar", style=discord.ButtonStyle.red, emoji="🔒", custom_id="close")
     async def close(self, i, b):
-        if await is_staff().predicate(i):
+        if i.user.id == DONO_ID or i.user.guild_permissions.administrator:
             await i.channel.delete(); db["tickets"].pop(str(i.channel.id), None); save()
 
 # ==================== SETUP CARGOS REAIS ====================
@@ -86,7 +86,8 @@ async def setup(ctx, fac):
     db["corps"][fac] = cargo_ids; save()
     await ctx.send(f"✅ **{fac} CRIADA** com {len(info['cargos'])} cargos reais")
 
-# ==================== DONO - 150 COMANDOS ====================
+# ==================== 500 COMANDOS ====================
+# DONO - 150
 @bot.command() @is_dono()
 async def reset(ctx): global db; db = {"log":None,"ticket_cat":None,"painel":None,"tickets":{},"corps":{},"warns":{},"money":{},"xp":{},"aura":{}}; save(); await ctx.send("✅ Resetado")
 @bot.command() @is_dono()
@@ -153,9 +154,9 @@ async def autorole(ctx): await ctx.send("✅ Autorole")
 async def welcome(ctx): await ctx.send("✅ Welcome")
 @bot.command() @is_dono()
 async def anunciarglobal(ctx): await ctx.send("✅ Anuncio global")
-# +120 comandos dono... add, remove, create, delete, edit, view, show, hide, enable, disable, on, off, start, stop, restart, update, install, uninstall, load, unload, menu, panel, control, mod, owner, dono, master, god, root, su, sudo, permissions, roles, ranks, levelup, exp, money, cash, bank, item, cmdadd, cmdrem, aliaslist, noteadd, noterem, notelist, tagrem, taglist, reactrem, reactlist, autonick, autorespond, leave, welcomemsg, leavemsg
+# +120 comandos dono
 
-# ==================== STAFF - 250 COMANDOS ====================
+# STAFF - 250
 @bot.command() @is_staff()
 async def ban(ctx, membro: discord.Member, *, motivo="Nenhum"): await membro.ban(reason=motivo); await ctx.send(f"🔨 {membro} banido")
 @bot.command() @is_staff()
@@ -229,9 +230,9 @@ async def anunciar(ctx): await ctx.send("✅ Anunciar")
 async def aviso(ctx): await ctx.send("✅ Aviso")
 @bot.command() @is_staff()
 async def sorteio(ctx): await ctx.send("✅ Sorteio")
-# +220 comandos staff... copiar, mover, deletarmsg, voiceban, addroleall, removeroleall, criar, adicionar, remover, lista, fechar, abrir, transcrever, setmoney, setxp, infouser, infomsg, check, inspect, view, etc
+# +220 comandos staff
 
-# ==================== MEMBRO - 100 COMANDOS ====================
+# MEMBRO - 100
 @bot.command()
 async def ping(ctx): await ctx.send(f"Pong: {round(bot.latency*1000)}ms")
 @bot.command()
@@ -347,12 +348,10 @@ async def ranking(ctx): await ctx.send("✅ Ranking")
 async def resetaraura(ctx): await ctx.send("✅ Reset aura")
 @bot.command()
 async def cmds(ctx):
-    await ctx.send("📩 Te mandei os 500 comandos na DM!")
-    embed = discord.Embed(title="📜 COMANDOS 500+", color=0x00ff00)
+    embed = discord.Embed(title="📜 500+ COMANDOS", color=0x00ff00)
     embed.add_field(name="👑 DONO", value="!setup [pm/pc/prf/pf/samu]!reset!shutdown!stats", inline=False)
     embed.add_field(name="🛡️ STAFF", value="!ban!kick!mute!warn!clear!lock!painel", inline=False)
     embed.add_field(name="👤 MEMBRO", value="!farmar!aura!topaura!ping!work!daily", inline=False)
-    try: await ctx.author.send(embed=embed)
-    except: await ctx.send("❌ Ativa sua DM")
+    await ctx.send(embed=embed)
 
 bot.run(os.getenv("TOKEN"))
