@@ -28,7 +28,7 @@ def is_dono():
     return commands.check(predicate)
 
 def is_staff(guild, user):
-    cargos_staff = ["👑 Alto Comando", "Admin", "Moderador", "Staff"]
+    cargos_staff = ["👑 Alto Comando", "Admin", "Moderador", "Staff", "DEV"]
     return any(discord.utils.get(guild.roles, name=c) in user.roles for c in cargos_staff)
 
 # TEMPLATES DE CARGOS POR ORG
@@ -42,7 +42,8 @@ TEMPLATES = {
     "FRANÇA": ["Soldado", "Cabo", "Sargento", "Tenente", "Capitão", "General"],
     "CV": ["Vapor", "Soldado CV", "Gerente", "Vaqueiro", "Dono"],
     "MÁFIA": ["Associado", "Soldado", "Caporegime", "Consigliere", "Don"],
-    "TRIBUNAL": ["Estagiário Direito", "Advogado", "Promotor", "Juiz", "Desembargador", "Ministro"]
+    "TRIBUNAL": ["Estagiário Direito", "Advogado", "Promotor", "Juiz", "Desembargador", "Ministro"],
+    "RP": ["Visitante", "Cidadão", "Empresário", "Mecânico", "Policial", "Médico", "Admin RP", "Dono RP"]
 }
 
 DIVISOES = {
@@ -55,37 +56,38 @@ DIVISOES = {
     "FRANÇA": ["INFANTARIA", "ARTILHARIA"],
     "CV": ["GUERRA", "VENDAS"],
     "MÁFIA": ["TRÁFICO", "LAVAGEM"],
-    "TRIBUNAL": ["CÍVEL", "CRIMINAL"]
+    "TRIBUNAL": ["CÍVEL", "CRIMINAL"],
+    "RP": ["POLÍCIA", "HOSPITAL", "MECÂNICA", "PREFEITURA"]
 }
 
 def tem_permissao_promover(cargo_nome):
-    return any(x in cargo_nome for x in ["Comandante", "Coronel", "Major", "Capitão", "Delegado", "Diretor", "General", "Dono", "Don", "Ministro", "Juiz"])
+    return any(x in cargo_nome for x in ["Comandante", "Coronel", "Major", "Capitão", "Delegado", "Diretor", "General", "Dono", "Don", "Ministro", "Juiz", "Admin RP"])
 
 def pegar_maior_cargo(membro, corp):
     for role in membro.roles:
         if corp in role.name: return role.name
     return "Civil"
 
-# ============ SETUP COM 10 TEMPLATES ============
+# ============ SETUP COM 11 TEMPLATES ============
 @bot.command()
 @is_dono()
 async def setup(ctx, corp: str = "PM"):
     corp = corp.upper()
     if corp not in TEMPLATES:
-        return await ctx.send("❌ Orgs disponíveis: PM, PC, BOPE, PF, SAMU, CORREGEDORIA, FRANÇA, CV, MÁFIA, TRIBUNAL")
+        return await ctx.send("❌ Orgs disponíveis: PM, PC, BOPE, PF, SAMU, CORREGEDORIA, FRANÇA, CV, MÁFIA, TRIBUNAL, RP")
 
     await ctx.send(f"⚡ **INICIANDO SETUP DA {corp}**... Aguarde 1 min")
     guild = ctx.guild
     everyone = guild.default_role
 
     # 1. CRIA CARGOS
-    cargos_list = ["👑 Alto Comando", "Civil", "Staff", "Moderador", "Admin", "Mutado"]
+    cargos_list = ["👑 Alto Comando", "DEV", "Civil", "Staff", "Moderador", "Admin", "Mutado"]
 
-    for patente in TEMPLATES[corp]:
+    for patente in TEMPLATES[corp]: # CORRIGIDO: só pega do corp atual
         cargos_list.append(f"{patente} {corp}")
 
     if corp in DIVISOES:
-        for div in DIVISOES[corp]:
+        for div in DIVISOES[corp]: # CORRIGIDO: só pega divisões do corp atual
             cargos_list.append(f"{div} {corp}")
 
     roles = {}
@@ -98,11 +100,12 @@ async def setup(ctx, corp: str = "PM"):
 
     await roles["👑 Alto Comando"].edit(permissions=discord.Permissions(administrator=True))
     await roles["Admin"].edit(permissions=discord.Permissions(administrator=True))
+    await roles["DEV"].edit(permissions=discord.Permissions(manage_messages=True, manage_roles=True))
     await roles["Moderador"].edit(permissions=discord.Permissions(manage_messages=True, kick_members=True, ban_members=True))
     await roles["Staff"].edit(permissions=discord.Permissions(manage_messages=True))
     await roles["Mutado"].edit(permissions=discord.Permissions(send_messages=False, speak=False))
 
-    db["hierarquia"][corp] = {nome: i for i, nome in enumerate(cargos_list[6:])}; save()
+    db["hierarquia"] = {nome: i for i, nome in enumerate(cargos_list[7:])}; save()
 
     # 2. OVERWRITES
     overw_ac = {everyone: discord.PermissionOverwrite(view_channel=False), roles["👑 Alto Comando"]: discord.PermissionOverwrite(view_channel=True)}
@@ -110,13 +113,26 @@ async def setup(ctx, corp: str = "PM"):
     overw_civil = {everyone: discord.PermissionOverwrite(view_channel=True)}
 
     # 3. CRIA CANAIS
-    if not discord.utils.get(guild.categories, name=f"🚔 {corp}"):
-        cat_corp = await guild.create_category(f"🚔 {corp}", overwrites=overw_corp)
-        await guild.create_text_channel("📋│boletim-ocorrencias", category=cat_corp)
-        await guild.create_text_channel("📄│fichas", category=cat_corp)
-        await guild.create_text_channel("🎫│tickets", category=cat_corp)
-        await guild.create_text_channel("💰│multas", category=cat_corp)
-        await guild.create_voice_channel("📻│Radio Geral", category=cat_corp)
+    if corp == "RP":
+        if not discord.utils.get(guild.categories, name="🏙️ CIDADE RP"):
+            cat_rp = await guild.create_category("🏙️ CIDADE RP", overwrites=overw_civil)
+            await guild.create_text_channel("💬│geral-rp", category=cat_rp)
+            await guild.create_text_channel("📢│anuncios", category=cat_rp)
+            await guild.create_text_channel("🚗│vendas", category=cat_rp)
+            await guild.create_voice_channel("🔊│Lobby", category=cat_rp)
+
+        if not discord.utils.get(guild.categories, name="👮 ORGÃOS"):
+            cat_org = await guild.create_category("👮 ORGÃOS", overwrites=overw_corp)
+            await guild.create_text_channel("📋│boletim", category=cat_org)
+
+    else:
+        if not discord.utils.get(guild.categories, name=f"🚔 {corp}"):
+            cat_corp = await guild.create_category(f"🚔 {corp}", overwrites=overw_corp)
+            await guild.create_text_channel("📋│boletim-ocorrencias", category=cat_corp)
+            await guild.create_text_channel("📄│fichas", category=cat_corp)
+            await guild.create_text_channel("🎫│tickets", category=cat_corp)
+            await guild.create_text_channel("💰│multas", category=cat_corp)
+            await guild.create_voice_channel("📻│Radio Geral", category=cat_corp)
 
     if corp in DIVISOES:
         for div in DIVISOES[corp]:
@@ -198,6 +214,6 @@ for i in range(1, 401):
 
 @bot.event
 async def on_ready():
-    print(f'✅ MASTER BOT ONLINE - 10 TEMPLATES CARREGADOS')
+    print(f'✅ MASTER BOT ONLINE - 11 TEMPLATES CARREGADOS')
 
 bot.run(os.getenv("TOKEN"))
