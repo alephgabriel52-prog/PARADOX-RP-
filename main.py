@@ -6,6 +6,7 @@ from datetime import timedelta
 from flask import Flask
 from threading import Thread
 
+# KEEP ALIVE PRA RENDER
 app = Flask('')
 @app.route('/')
 def home(): return "Bot Online 24h"
@@ -17,14 +18,15 @@ bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
 @bot.event
 async def on_ready():
-    print(f'✅ Logado como {bot.user}')
-    await bot.change_presence(activity=discord.Game(name="!cmds | 500+ Comandos"))
+    print(f'========================================')
+    print(f'✅ BOT ONLINE: {bot.user}')
+    print(f'========================================')
 
 DONO_ID = 1438010935783460954
 ARQUIVO = 'config.json'
 try:
     with open(ARQUIVO, 'r', encoding='utf-8') as f: db = json.load(f)
-except: db = {"log":None,"ticket_cat":None,"painel":None,"tickets":{},"corps":{},"warns":{},"money":{},"xp":{},"aura":{}}
+except: db = {"painel":None,"ticket_cat":None,"tickets":{},"corps":{},"aura":{}}
 
 def save():
     with open(ARQUIVO, 'w', encoding='utf-8') as f: json.dump(db, f, ensure_ascii=False, indent=4)
@@ -41,7 +43,7 @@ def is_staff():
 
 class TicketView(View):
     def __init__(self): super().__init__(timeout=None)
-    @discord.ui.button(label="Abrir Ticket", style=discord.ButtonStyle.green, emoji="🎫", custom_id="ticket")
+    @discord.ui.button(label="Abrir Ticket", style=discord.ButtonStyle.green, emoji="🎫", custom_id="ticket_btn")
     async def ticket(self, i, b):
         cat = bot.get_channel(db["ticket_cat"]) if db["ticket_cat"] else None
         overwrites = {i.guild.default_role: discord.PermissionOverwrite(view_channel=False), i.user: discord.PermissionOverwrite(view_channel=True)}
@@ -52,7 +54,7 @@ class TicketView(View):
 
 class CloseView(View):
     def __init__(self): super().__init__(timeout=None)
-    @discord.ui.button(label="Fechar", style=discord.ButtonStyle.red, emoji="🔒", custom_id="close")
+    @discord.ui.button(label="Fechar", style=discord.ButtonStyle.red, emoji="🔒", custom_id="close_btn")
     async def close(self, i, b):
         if i.user.id == DONO_ID or i.user.guild_permissions.administrator:
             await i.channel.delete(); db["tickets"].pop(str(i.channel.id), None); save()
@@ -82,43 +84,54 @@ async def setup(ctx, fac):
     await ctx.send(f"✅ **{fac} CRIADA** com {len(info['cargos'])} cargos")
 
 @bot.command() @is_staff()
-async def ban(ctx, membro: discord.Member, *, motivo="Nenhum"): await membro.ban(reason=motivo); await ctx.send(f"🔨 {membro} banido")
+async def ban(ctx, membro: discord.Member, *, motivo="Nenhum"): await membro.ban(reason=motivo); await ctx.send(f"🔨 {membro} banido | Motivo: {motivo}")
+
 @bot.command() @is_staff()
-async def kick(ctx, membro: discord.Member, *, motivo="Nenhum"): await membro.kick(reason=motivo); await ctx.send(f"👢 {membro} kickado")
+async def kick(ctx, membro: discord.Member, *, motivo="Nenhum"): await membro.kick(reason=motivo); await ctx.send(f"👢 {membro} kickado | Motivo: {motivo}")
+
 @bot.command() @is_staff()
-async def mute(ctx, membro: discord.Member): await membro.timeout(timedelta(minutes=10)); await ctx.send(f"🔇 {membro} mutado")
+async def mute(ctx, membro: discord.Member): await membro.timeout(timedelta(minutes=10)); await ctx.send(f"🔇 {membro} mutado por 10min")
+
 @bot.command() @is_staff()
-async def clear(ctx, qtd=5): await ctx.channel.purge(limit=int(qtd)+1); await ctx.send(f"🧹 {qtd} msgs apagadas")
+async def clear(ctx, qtd=5): await ctx.channel.purge(limit=int(qtd)+1); await ctx.send(f"🧹 {qtd} mensagens apagadas")
+
 @bot.command() @is_staff()
 async def painel(ctx):
     canal = bot.get_channel(db["painel"])
     if canal:
-        embed = discord.Embed(title="🎫 PAINEL DE SUPORTE", description="Clique no botão abaixo", color=0x00ff00)
+        embed = discord.Embed(title="🎫 PAINEL DE SUPORTE", description="Clique no botão abaixo para abrir um ticket", color=0x00ff00)
         await canal.send(embed=embed, view=TicketView())
         await ctx.send("✅ Painel enviado")
     else:
-        await ctx.send("❌ Use!setpainel #canal primeiro")
+        await ctx.send("❌ Use `!setpainel #canal` primeiro")
+
 @bot.command() @is_staff()
-async def setpainel(ctx, canal: discord.TextChannel): db["painel"] = canal.id; save(); await ctx.send(f"✅ Painel em {canal.mention}")
+async def setpainel(ctx, canal: discord.TextChannel): db["painel"] = canal.id; save(); await ctx.send(f"✅ Painel definido em {canal.mention}")
+
+@bot.command() @is_staff()
+async def setticket(ctx, categoria: discord.CategoryChannel): db["ticket_cat"] = categoria.id; save(); await ctx.send(f"✅ Categoria de tickets: {categoria.name}")
 
 @bot.command()
-async def ping(ctx): await ctx.send(f'Pong! {round(bot.latency*1000)}ms')
+async def ping(ctx): await ctx.send(f'🏓 Pong! {round(bot.latency*1000)}ms')
+
 @bot.command()
 async def farmar(ctx):
     ganho = random.randint(10,50)
     db["aura"][str(ctx.author.id)] = db["aura"].get(str(ctx.author.id),0) + ganho
     save()
     await ctx.send(f"🌪️ + {ganho} aura | Total: {db['aura'][str(ctx.author.id)]}")
+
 @bot.command()
 async def aura(ctx, membro: discord.Member=None):
     m = membro or ctx.author
     await ctx.send(f"⚡ {m.name} tem {db['aura'].get(str(m.id),0)} de aura")
+
 @bot.command()
 async def cmds(ctx):
-    embed = discord.Embed(title="📜 COMANDOS", color=0x00ff00)
-    embed.add_field(name="👑 DONO", value="`!setup [fac]`", inline=False)
-    embed.add_field(name="🛡️ STAFF", value="`!ban` `!kick` `!mute` `!clear` `!painel`", inline=False)
-    embed.add_field(name="👤 MEMBRO", value="`!ping` `!farmar` `!aura`", inline=False)
+    embed = discord.Embed(title="📜 COMANDOS PARADOX", color=0x00ff00)
+    embed.add_field(name="👑 DONO", value="`!setup [PM/PC/PRF/PF/SAMU]` `!setticket #cat`", inline=False)
+    embed.add_field(name="🛡️ STAFF", value="`!ban` `!kick` `!mute` `!clear` `!painel` `!setpainel`", inline=False)
+    embed.add_field(name="👤 MEMBRO", value="`!ping` `!farmar` `!aura` `!cmds`", inline=False)
     await ctx.send(embed=embed)
 
 bot.run(os.getenv("TOKEN"))
