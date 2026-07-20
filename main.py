@@ -56,10 +56,7 @@ DIVISOES = {
     "RP": ["POLÍCIA", "HOSPITAL", "MECÂNICA", "PREFEITURA"]
 }
 
-def tem_permissao_promover(cargo_nome):
-    return any(x in cargo_nome for x in ["Comandante", "Coronel", "Major", "Capitão", "Delegado", "Diretor", "General", "Dono", "Don", "Ministro", "Juiz", "Admin RP"])
-
-# ============ SETUP CORRIGIDO ============
+# ============ SETUP CORRIGIDO 100% ============
 @bot.command()
 @is_dono()
 async def setup(ctx, corp: str = "PM"):
@@ -71,22 +68,25 @@ async def setup(ctx, corp: str = "PM"):
     guild = ctx.guild
     everyone = guild.default_role
 
-    # 1. CRIA CARGOS SÓ DA ORG ESCOLHIDA
+    # 1. CRIA CARGOS SÓ DA ORG ESCOLHIDA - CORRIGIDO
     cargos_list = ["👑 Alto Comando", "DEV", "Equipe Staff", "Civil", "Staff", "Moderador", "Admin", "Mutado"]
 
-    for patente in TEMPLATES[corp]: # CORRIGIDO: só do corp
+    for patente in TEMPLATES[corp]: # CORRIGIDO: só pega do corp atual
         cargos_list.append(f"{patente} {corp}")
 
     if corp in DIVISOES:
-        for div in DIVISOES[corp]: # CORRIGIDO: só do corp
+        for div in DIVISOES[corp]: # CORRIGIDO: só pega divisões do corp atual
             cargos_list.append(f"{div} {corp}")
 
     roles = {}
     for nome in cargos_list:
         role = discord.utils.get(guild.roles, name=nome)
         if not role:
-            role = await guild.create_role(name=nome, reason=f"Setup {corp}")
-            await asyncio.sleep(0.3) # delay pra não tomar rate limit
+            try:
+                role = await guild.create_role(name=nome, reason=f"Setup {corp}")
+                await asyncio.sleep(0.5) # delay maior pra não bugar
+            except Exception as e:
+                await ctx.send(f"❌ Erro ao criar cargo {nome}: {e}")
         roles[nome] = role
 
     await roles["👑 Alto Comando"].edit(permissions=discord.Permissions(administrator=True))
@@ -144,7 +144,7 @@ async def setup(ctx, corp: str = "PM"):
     db["corps"][str(guild.id)] = corp; save()
     await msg.edit(content=f"✅ **SETUP DA {corp} CONCLUÍDO!**\n✅ {len(cargos_list)} cargos criados\n✅ Canais e divisões da {corp} criadas")
 
-# ============ PAINEIS NO PV ============
+# ============ PAINEIS NO PV CORRIGIDO ============
 @bot.command(name='paineldono')
 async def paineldono(ctx):
     if ctx.author.id!= DONO_ID:
@@ -153,53 +153,57 @@ async def paineldono(ctx):
     embed = discord.Embed(title="👑 PAINEL DO DONO", description="Gerencie seu servidor RP", color=0xFF0000)
     embed.add_field(name="Setup", value="`!setup pm` `!setup pc` `!setup bope`", inline=False)
     embed.add_field(name="Staff", value="`!setstaff @membro Equipe Staff`", inline=False)
-    embed.add_field(name="Apagar Tudo", value="`!resetserver`", inline=False)
+    embed.add_field(name="Apagar Tudo", value="`!resetserver` - Apaga na hora", inline=False)
     embed.add_field(name="Anunciar", value="`!anunciar mensagem`", inline=False)
     try:
         await ctx.author.send(embed=embed)
-        await ctx.send("✅ Te mandei o painel no PV")
+        await ctx.message.delete() # APAGA IMEDIATO
     except:
         await ctx.send("❌ Ativa sua DM pra eu te mandar o painel")
 
 @bot.command(name='painelstaff')
 async def painelstaff(ctx):
-    if STAFF_ROLE_ID not in [r.id for r in ctx.author.roles]: # PELO ID AGORA
+    if STAFF_ROLE_ID not in [r.id for r in ctx.author.roles]: # PELO ID
         await ctx.send("❌ **Você não tem permissão.** Só `Equipe Staff` pode usar.")
         return
     embed = discord.Embed(title="📋 PAINEL EQUIPE STAFF", description="Comandos disponíveis", color=0x00FF00)
     embed.add_field(name="Promover", value="`!promover @membro Cargo`", inline=False)
     embed.add_field(name="Rebaixar", value="`!rebaixar @membro Cargo`", inline=False)
-    embed.addField(name="Exonerar", value="`!exonerar @membro`", inline=False)
+    embed.add_field(name="Exonerar", value="`!exonerar @membro`", inline=False) # CORRIGIDO add_field
     embed.add_field(name="Banir", value="`!ban @membro motivo`", inline=False)
     try:
         await ctx.author.send(embed=embed)
-        await ctx.send("✅ Te mandei o painel no PV")
+        await ctx.message.delete() # APAGA IMEDIATO
     except:
         await ctx.send("❌ Ativa sua DM pra eu te mandar o painel")
 
-# ============ COMANDOS NOVOS PRO DONO ============
+# ============ COMANDOS NOVOS PRO DONO/STAFF ============
 @bot.command()
-@is_dono()
+@commands.has_any_role(DONO_ID, STAFF_ROLE_ID) # DONO OU STAFF APAGA NA HORA
 async def resetserver(ctx):
-    """Apaga todos canais e cargos criados pelo bot"""
-    await ctx.send("⚠️ Apagando tudo em 5s...")
-    await asyncio.sleep(5)
+    """Apaga todos canais e cargos criados pelo bot IMEDIATO"""
+    await ctx.message.delete() # APAGA O COMANDO
+    msg = await ctx.send("⚠️ Apagando tudo...")
     for channel in ctx.guild.channels:
-        if channel.name!= "geral": await channel.delete()
+        if channel.name not in ["geral", "comandos"]:
+            try: await channel.delete()
+            except: pass
     for role in ctx.guild.roles:
-        if role.name not in ["@everyone", "Admin"]: await role.delete()
-    await ctx.send("✅ Servidor resetado")
+        if role.name not in ["@everyone", "Admin", "👑 Alto Comando"]:
+            try: await role.delete()
+            except: pass
+    await msg.edit(content="✅ Servidor resetado")
 
 @bot.command()
 @is_dono()
 async def anunciar(ctx, *, mensagem):
     """Manda anúncio em todos servidores"""
+    await ctx.message.delete()
     for guild in bot.guilds:
         canal = discord.utils.get(guild.text_channels, name="anuncios")
         if canal: await canal.send(f"📢 **ANÚNCIO OFICIAL**\n{mensagem}")
-    await ctx.send("✅ Anúncio enviado")
+    await ctx.send("✅ Anúncio enviado", delete_after=3)
 
-# ============ COMANDOS HIERARQUIA ============
 @bot.command()
 async def promover(ctx, membro: discord.Member, *, cargo_novo: str):
     corp = db["corps"].get(str(ctx.guild.id), "PM")
@@ -208,7 +212,7 @@ async def promover(ctx, membro: discord.Member, *, cargo_novo: str):
     for c in membro.roles:
         if corp in c.name: await membro.remove_roles(c)
     await membro.add_roles(cargo_obj)
-    await ctx.send(f"📈 {membro.mention} promovido para **{cargo_novo}**")
+    await ctx.send(f"📈 {membro.mention} promovido para **{cargo_novo}**", delete_after=5)
 
 @bot.command()
 @is_dono()
@@ -216,10 +220,10 @@ async def setstaff(ctx, membro: discord.Member, *, cargo: str):
     cargo_obj = discord.utils.get(ctx.guild.roles, name=cargo)
     if not cargo_obj: return await ctx.send(f"❌ Cargo `{cargo}` não existe")
     await membro.add_roles(cargo_obj)
-    await ctx.send(f"✅ {membro.mention} agora é **{cargo}**")
+    await ctx.send(f"✅ {membro.mention} agora é **{cargo}**", delete_after=5)
 
 @bot.event
 async def on_ready():
-    print(f'✅ MASTER BOT ONLINE V4')
+    print(f'✅ MASTER BOT ONLINE V5')
 
 bot.run(os.getenv("TOKEN"))
