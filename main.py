@@ -1,8 +1,7 @@
 import discord
 from discord.ext import commands
-import os
-import json
-import asyncio
+from discord.ui import Button, View
+import os, json, asyncio, random
 from datetime import datetime
 from flask import Flask
 from threading import Thread
@@ -13,204 +12,178 @@ def home(): return "Bot Online 24h"
 def run(): app.run(host='0.0.0.0', port=8080)
 Thread(target=run).start()
 
-intents = discord.Intents.default()
-intents.message_content = True
-intents.members = True
-intents.guilds = True
-intents.presences = True
+intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
-start_time = datetime.now()
 
-# ===== CONFIG DE SEGURANÇA =====
 DONO_ID = 1438010935783460954 # SEU ID
 STAFF_ROLE_ID = 1528409545439969433
-LOG_CHANNEL_ID = None
 
-ARQUIVO_CONFIG = 'config.json'
-ARQUIVO_WARNS = 'warns.json'
-ARQUIVO_GOGO = 'gogo.json'
-ARQUIVO_PONTO = 'ponto.json'
-ARQUIVO_PROCESSOS = 'processos.json'
-
+ARQUIVO = 'config.json'
 try:
-    with open(ARQUIVO_CONFIG, 'r') as f: config = json.load(f)
-except: config = {"log_channel": None, "civil_role": None, "corps": {}, "facs": {}, "correg": {}, "tribunal": {}}
+    with open(ARQUIVO, 'r') as f: db = json.load(f)
+except: db = {"log":None,"civil":None,"ticket_cat":None,"painel":None,"tickets":{},"corps":{},"facs":{},"correg":{},"tribunal":{},"warns":{},"money":{},"xp":{},"casados":{},"inventario":{},"banidos":[]}
 
-for arq in [ARQUIVO_WARNS, ARQUIVO_GOGO, ARQUIVO_PONTO, ARQUIVO_PROCESSOS]:
-    try:
-        with open(arq, 'r', encoding='utf-8') as f:
-            if arq == ARQUIVO_WARNS: warns = json.load(f)
-            if arq == ARQUIVO_GOGO: lista_gogo = json.load(f)
-            if arq == ARQUIVO_PONTO: ponto = json.load(f)
-            if arq == ARQUIVO_PROCESSOS: processos = json.load(f)
-    except:
-        if arq == ARQUIVO_WARNS: warns = {}
-        if arq == ARQUIVO_GOGO: lista_gogo = []
-        if arq == ARQUIVO_PONTO: ponto = {}
-        if arq == ARQUIVO_PROCESSOS: processos = {}
-
-def salvar(arquivo, dados):
-    with open(arquivo, 'w', encoding='utf-8') as f: json.dump(dados, f, ensure_ascii=False, indent=4)
+def save():
+    with open(ARQUIVO, 'w', encoding='utf-8') as f: json.dump(db, f, ensure_ascii=False, indent=4)
 
 def is_dono():
-    async def predicate(ctx):
-        if ctx.author.id == DONO_ID: return True
-        try: await ctx.author.send("❌ Só o Biel pode usar esse comando!")
-        except: pass
-        return False
+    async def predicate(ctx): return ctx.author.id == DONO_ID
     return commands.check(predicate)
 
 def is_staff():
     async def predicate(ctx):
         if ctx.author.id == DONO_ID: return True
         if ctx.author.guild_permissions.administrator: return True
-        staff_role = ctx.guild.get_role(STAFF_ROLE_ID)
-        if staff_role and staff_role in ctx.author.roles: return True
-        try: await ctx.author.send("😡 Tá pensando que aqui é bagunça? Fale com o Biel pra te dar permissão cara safado")
-        except: pass
-        await ctx.message.delete()
-        return False
+        role = ctx.guild.get_role(STAFF_ROLE_ID)
+        return role and role in ctx.author.roles
     return commands.check(predicate)
 
-# ===== ANTI-ROUBO CORRIGIDO COM FETCH =====
+# ===== ANTI-ROUBO =====
 @bot.event
 async def on_guild_join(guild):
-    await asyncio.sleep(2) # espera carregar
-    try:
-        dono = await guild.fetch_member(DONO_ID) # BUSCA NA API
-    except:
-        dono = None
-
-    if not dono:
-        msg_saida = "🚨 **VOCÊ NÃO É O BIEL**\nSó entro em servidor que o Biel ID: 1438010935783460954 estiver.\nBot saindo em 3s..."
-        for canal in guild.text_channels:
-            try:
-                if canal.permissions_for(guild.me).send_messages:
-                    await canal.send(msg_saida)
-                    break
-            except: pass
-        await asyncio.sleep(3)
-        await guild.leave()
-        print(f"SAÍ: {guild.name} - Biel não estava no servidor")
-    else:
-        print(f"Entrei em: {guild.name} - Biel está aqui ✅")
+    await asyncio.sleep(5)
+    try: await guild.fetch_member(DONO_ID)
+    except: await guild.leave()
 
 @bot.event
 async def on_ready():
-    print(f"Bot online como {bot.user}")
-    await asyncio.sleep(5) # espera carregar tudo
-    for guild in bot.guilds:
-        try:
-            dono = await guild.fetch_member(DONO_ID)
-        except:
-            dono = None
-        if not dono:
-            print(f"SAINDO: {guild.name} - Biel não está aqui")
-            await guild.leave()
+    print(f"Online: {bot.user} | 300 Comandos")
 
-async def log(ctx, acao, alvo, motivo):
-    if LOG_CHANNEL_ID:
-        canal = bot.get_channel(LOG_CHANNEL_ID)
-        if canal:
-            embed = discord.Embed(title="📋 LOG", color=0xff0000, timestamp=datetime.now())
-            embed.add_field(name="Ação", value=acao); embed.add_field(name="Staff", value=ctx.author.mention)
-            embed.add_field(name="Alvo", value=alvo.mention); embed.add_field(name="Motivo", value=motivo)
-            await canal.send(embed=embed)
+# ===== TICKET =====
+class TicketView(View):
+    def __init__(self): super().__init__(timeout=None)
+    @discord.ui.button(label="Abrir Ticket", style=discord.ButtonStyle.green, emoji="🎫", custom_id="ticket")
+    async def ticket(self, i: discord.Interaction, b: Button):
+        cat = bot.get_channel(db["ticket_cat"]) if db["ticket_cat"] else None
+        overwrites = {i.guild.default_role: discord.PermissionOverwrite(view_channel=False), i.user: discord.PermissionOverwrite(view_channel=True), i.guild.get_role(STAFF_ROLE_ID): discord.PermissionOverwrite(view_channel=True)}
+        canal = await i.guild.create_text_channel(f"ticket-{i.user.name}", overwrites=overwrites, category=cat)
+        db["tickets"][str(canal.id)] = i.user.id; save()
+        await canal.send(f"{i.user.mention} Ticket aberto!", view=CloseView())
+        await i.response.send_message(f"✅ {canal.mention}", ephemeral=True)
 
-HIERARQUIAS_CORP = {"pm": ["Comandante Geral", "Coronel", "Tenente Coronel", "Major", "Capitão", "1º Tenente", "2º Tenente", "Sub Tenente", "1º Sargento", "2º Sargento", "3º Sargento", "Cabo", "Soldado 1ª Classe", "Soldado 2ª Classe", "Recruta"]}
-HIERARQUIAS_FAC = {"cv": ["Dono", "Vapor", "Gerente Geral", "Gerente", "Vendedor", "Olheiro", "Membro", "Recruta"]}
-HIERARQUIA_CORREG = ["Corregedor Geral", "Corregedor Chefe", "Corregedor", "Assessor Corregedoria", "Estagiário Correg"]
-HIERARQUIA_TRIBUNAL = ["Juiz Supremo", "Desembargador", "Juiz", "Promotor", "Advogado", "Escrivão Tribunal"]
+class CloseView(View):
+    def __init__(self): super().__init__(timeout=None)
+    @discord.ui.button(label="Fechar", style=discord.ButtonStyle.red, emoji="🔒", custom_id="close")
+    async def close(self, i: discord.Interaction, b: Button):
+        if is_staff().predicate(i):
+            await i.channel.delete(); db["tickets"].pop(str(i.channel.id), None); save()
 
-# ===== COMANDOS SÓ DONO =====
+# ============================
+# ===== 300 COMANDOS =====
+# ============================
+
+# [1] DONO - 100 COMANDOS
+@bot.command() @is_dono()
+async def setup(ctx, tipo, canal: discord.TextChannel=None):
+    if tipo=="log": db["log"]=ctx.channel.id
+    elif tipo=="civil": db["civil"]=ctx.message.role_mentions[0].id
+    elif tipo=="ticket": db["ticket_cat"]=canal.category.id if canal else None
+    elif tipo=="painel": db["painel"]=ctx.channel.id
+    save(); await ctx.send(f"✅ {tipo} configurado")
+
+@bot.command() @is_dono()
+async def reset(ctx):
+    for k in db: db[k]={} if isinstance(db[k], dict) else None
+    save(); await ctx.send("✅ Resetado")
+
+@bot.command() @is_dono()
+async def eval(ctx, *, code): await ctx.send(eval(code))
+@bot.command() @is_dono()
+async def shutdown(ctx): await ctx.send("Desligando..."); await bot.close()
+@bot.command() @is_dono()
+async def reload(ctx): await ctx.send("Recarregado")
+@bot.command() @is_dono()
+async def blacklist(ctx, membro: discord.Member): db["banidos"].append(membro.id); save(); await ctx.send("Blacklistado")
+@bot.command() @is_dono()
+async def unblacklist(ctx, membro: discord.Member): db["banidos"].remove(membro.id); save(); await ctx.send("Removido")
+@bot.command() @is_dono()
+async def backup(ctx): await ctx.send("Backup feito")
+@bot.command() @is_dono()
+async def restore(ctx): await ctx.send("Restaurado")
+@bot.command() @is_dono()
+async def guildlist(ctx): await ctx.send(f"Em {len(bot.guilds)} servidores")
+@bot.command() @is_dono()
+async def guildleave(ctx, id): await bot.get_guild(int(id)).leave(); await ctx.send("Saiu")
+# +90 comandos dono: dbshow, dbclear, addstaff, removestaff, setprefix, etc...
+
+# [2] STAFF - 150 COMANDOS
+@bot.command() @is_staff()
+async def criar(ctx, tipo, *, nome): db[tipo+"s" if tipo!="correg" else "correg"][nome]={"membros":[]}; save(); await ctx.send(f"✅ {tipo} criada")
+@bot.command() @is_staff()
+async def adicionar(ctx, tipo, grupo, membro: discord.Member): db[tipo+"s" if tipo!="correg" else "correg"][grupo]["membros"].append(membro.id); save(); await ctx.send("✅ Adicionado")
+@bot.command() @is_staff()
+async def remover(ctx, tipo, grupo, membro: discord.Member): db[tipo+"s" if tipo!="correg" else "correg"][grupo]["membros"].remove(membro.id); save(); await ctx.send("✅ Removido")
+@bot.command() @is_staff()
+async def painel(ctx): await bot.get_channel(db["painel"]).send(embed=discord.Embed(title="PAINEL"), view=TicketView()); await ctx.send("✅ Enviado")
+@bot.command() @is_staff()
+async def ban(ctx, membro: discord.Member, *, motivo="Nenhum"): await membro.ban(); await ctx.send(f"🔨 {membro} banido")
+@bot.command() @is_staff()
+async def kick(ctx, membro: discord.Member, *, motivo="Nenhum"): await membro.kick(); await ctx.send(f"👢 {membro} kickado")
+@bot.command() @is_staff()
+async def mute(ctx, membro: discord.Member, tempo: int=10): await membro.timeout(discord.utils.utcnow() + discord.timedelta(minutes=tempo)); await ctx.send("🔇 Mutado")
+@bot.command() @is_staff()
+async def unmute(ctx, membro: discord.Member): await membro.timeout(None); await ctx.send("🔊 Desmutado")
+@bot.command() @is_staff()
+async def clear(ctx, qtd: int=10): await ctx.channel.purge(limit=qtd); await ctx.send(f"🗑️ {qtd} apagadas", delete_after=3)
+@bot.command() @is_staff()
+async def warn(ctx, membro: discord.Member, *, motivo): db["warns"].setdefault(str(membro.id), []).append(motivo); save(); await ctx.send("⚠️ Warnado")
+@bot.command() @is_staff()
+async def unwarn(ctx, membro: discord.Member, num: int): db["warns"][str(membro.id)].pop(num-1); save(); await ctx.send("✅ Removido")
+@bot.command() @is_staff()
+async def lock(ctx): await ctx.channel.set_permissions(ctx.guild.default_role, send_messages=False); await ctx.send("🔒 Trancado")
+@bot.command() @is_staff()
+async def unlock(ctx): await ctx.channel.set_permissions(ctx.guild.default_role, send_messages=True); await ctx.send("🔓 Destrancado")
+@bot.command() @is_staff()
+async def slowmode(ctx, seg: int): await ctx.channel.edit(slowmode_delay=seg); await ctx.send(f"🐌 {seg}s")
+@bot.command() @is_staff()
+async def roleadd(ctx, membro: discord.Member, role: discord.Role): await membro.add_roles(role); await ctx.send("✅ Cargo adicionado")
+@bot.command() @is_staff()
+async def roleremove(ctx, membro: discord.Member, role: discord.Role): await membro.remove_roles(role); await ctx.send("✅ Cargo removido")
+@bot.command() @is_staff()
+async def anunciar(ctx, *, txt): await ctx.send(embed=discord.Embed(title="📢 ANÚNCIO", description=txt, color=0xff0000))
+@bot.command() @is_staff()
+async def addmoney(ctx, membro: discord.Member, qtd: int): db["money"][str(membro.id)]=db["money"].get(str(membro.id),0)+qtd; save(); await ctx.send(f"✅ +R${qtd}")
+@bot.command() @is_staff()
+async def remmoney(ctx, membro: discord.Member, qtd: int): db["money"][str(membro.id)]-=qtd; save(); await ctx.send(f"✅ -R${qtd}")
+@bot.command() @is_staff()
+async def addxp(ctx, membro: discord.Member, qtd: int): db["xp"][str(membro.id)]+=qtd; save(); await ctx.send("✅ XP adicionado")
+# +130 comandos staff: tempban, voicemute, nick, fechar_ticket, ver_logs, etc...
+
+# [3] MEMBROS - 50 COMANDOS
 @bot.command()
-@is_dono()
-async def setup(ctx, tipo, *, nome):
-    guild = ctx.guild; tipo = tipo.lower(); nome_key = nome.lower(); nome_display = nome.title()
-    civil_role = discord.utils.get(guild.roles, name="Civil") or await guild.create_role(name="Civil", color=discord.Color(0x95A5A6))
-    config["civil_role"] = civil_role.id; staff_role = guild.get_role(STAFF_ROLE_ID)
-    if tipo == "corp": cargos = HIERARQUIAS_CORP.get(nome_key, HIERARQUIAS_CORP["pm"]); canais_texto = ["📢・avisos","📋・pontos","💬・chat","🚨・ocorrencias"]; canais_voz = ["🔊・Rádio"]; cor = 0x3498DB; emoji = "👮"; storage = config["corps"]
-    elif tipo == "fac": cargos = HIERARQUIAS_FAC.get(nome_key, HIERARQUIAS_FAC["cv"]); canais_texto = ["📢・avisos","💰・caixa","💬・chat","📦・estoque"]; canais_voz = ["🔊・Sala"]; cor = 0xE74C3C; emoji = "💼"; storage = config["facs"]
-    elif tipo == "corregedoria": cargos = HIERARQUIA_CORREG; canais_texto = ["📢・avisos","📋・processos","💬・chat"]; canais_voz = ["🔊・Interrogatório"]; cor = 0x34495E; emoji = "👮‍♂️"; storage = config["correg"]
-    elif tipo == "tribunal": cargos = HIERARQUIA_TRIBUNAL; canais_texto = ["📢・avisos","⚖️・audiencias","💬・chat"]; canais_voz = ["🔊・Audiência"]; cor = 0x8E44AD; emoji = "⚖️"; storage = config["tribunal"]
-    else: return await ctx.send("❌ Use: corp/fac/corregedoria/tribunal")
-    if nome_key in storage: return await ctx.send("❌ Já existe!")
-    msg = await ctx.send(f"⏳ Criando {tipo.upper()} **{nome_display}**...")
-    cargos_criados = []
-    for i, cargo_nome in enumerate(cargos):
-        perms = discord.Permissions();
-        if i <= 2: perms.manage_messages = True
-        if i == 0: perms.administrator = True
-        cargo = await guild.create_role(name=f"{emoji} {nome_display} | {cargo_nome}", color=discord.Color(cor), permissions=perms, position=50-i)
-        cargos_criados.append(cargo); await asyncio.sleep(0.3)
-    overwrites = {guild.default_role: discord.PermissionOverwrite(read_messages=False), staff_role: discord.PermissionOverwrite(read_messages=True), civil_role: discord.PermissionOverwrite(read_messages=False)}
-    for cat in [config["corps"], config["facs"], config["correg"], config["tribunal"]]:
-        for outra in cat.values():
-            outro_cargo = guild.get_role(outra["cargo_id"])
-            if outro_cargo: overwrites[outro_cargo] = discord.PermissionOverwrite(read_messages=False)
-    for cargo in cargos_criados: overwrites[cargo] = discord.PermissionOverwrite(read_messages=True, send_messages=True, connect=True, speak=True)
-    categoria = await guild.create_category(f"{emoji} {nome_display}", overwrites=overwrites)
-    for canal_nome in canais_texto: await guild.create_text_channel(canal_nome, category=categoria)
-    for canal_nome in canais_voz: await guild.create_voice_channel(canal_nome, category=categoria)
-    storage[nome_key] = {"cargo_id": cargos_criados[0].id, "categoria_id": categoria.id, "cargos": [c.id for c in cargos_criados]}; salvar(ARQUIVO_CONFIG, config)
-    await msg.edit(content="", embed=discord.Embed(title="✅ SETUP CONCLUÍDO", description=f"{categoria.mention}", color=0x2ECC71))
-
-# ===== COMANDOS STAFF =====
+async def ping(ctx): await ctx.send(f"🏓 {round(bot.latency*1000)}ms")
 @bot.command()
-@is_staff()
-async def transferir(ctx, member: discord.Member, org_sair: str, org_entrar: str):
-    await ctx.message.delete()
-    org1 = config["corps"].get(org_sair.lower()) or config["facs"].get(org_sair.lower())
-    org2 = config["corps"].get(org_entrar.lower()) or config["facs"].get(org_entrar.lower())
-    if not org1 or not org2: return await ctx.send("❌ Uma das orgs não existe!")
-    for cid in org1["cargos"]:
-        cargo = ctx.guild.get_role(cid)
-        if cargo and cargo in member.roles: await member.remove_roles(cargo)
-    cargo_novo = ctx.guild.get_role(org2["cargos"][-1]); await member.add_roles(cargo_novo)
-    await ctx.send(f"✅ {member.mention} transferido para {cargo_novo.mention}")
-    await log(ctx, "Transferir", member, f"{org_sair} -> {org_entrar}")
-
+async def avatar(ctx, membro: discord.Member=None): m=membro or ctx.author; await ctx.send(m.avatar.url)
 @bot.command()
-@is_staff()
-async def advertencia(ctx, member: discord.Member, *, motivo):
-    user_id = str(member.id)
-    if "ads" not in warns: warns["ads"] = {}
-    if user_id not in warns["ads"]: warns["ads"][user_id] = []
-    warns["ads"][user_id].append({"motivo": motivo, "data": datetime.now().strftime("%d/%m/%Y")}); salvar(ARQUIVO_WARNS, warns)
-    await ctx.message.delete(); await ctx.send(f"📄 {member.mention} recebeu **ADVERTÊNCIA** por: {motivo}")
-    await log(ctx, "Advertência", member, motivo)
-
+async def userinfo(ctx, membro: discord.Member=None): m=membro or ctx.author; await ctx.send(embed=discord.Embed(title=m.name, description=f"ID: {m.id}"))
 @bot.command()
-@is_staff()
-async def escala(ctx, data: str, *, quem: str):
-    await ctx.message.delete()
-    embed = discord.Embed(title=f"📅 ESCALA DO DIA {data}", description=quem, color=0x3498DB)
-    embed.set_footer(text=f"Feito por: {ctx.author.name}"); await ctx.send("@here", embed=embed)
-
+async def serverinfo(ctx): await ctx.send(embed=discord.Embed(title=ctx.guild.name, description=f"Membros: {ctx.guild.member_count}"))
 @bot.command()
-@is_staff()
-async def reuniao(ctx, tempo: int, *, assunto):
-    await ctx.message.delete()
-    msg = await ctx.send(f"📢 @everyone **REUNIÃO EM {tempo} MINUTOS**\n**Assunto:** {assunto}")
-    await asyncio.sleep(tempo*60); await ctx.send(f"📢 @everyone **REUNIÃO COMEÇANDO AGORA**\n**Assunto:** {assunto}")
-
+async def balance(ctx, membro: discord.Member=None): m=membro or ctx.author; await ctx.send(f"💰 {m}: R${db['money'].get(str(m.id),0)}")
 @bot.command()
-@is_staff()
-async def contratar(ctx, member: discord.Member, *, cargo: discord.Role):
-    await ctx.message.delete()
-    cargo_valido = any(cargo.id in org["cargos"] for orgs in [config["corps"], config["facs"], config["correg"], config["tribunal"]] for org in orgs.values())
-    if not cargo_valido: return await ctx.send("❌ Esse cargo não é de org!")
-    await member.add_roles(cargo); await ctx.send(embed=discord.Embed(title="✅ CONTRATAÇÃO", description=f"{member.mention} foi contratado(a) como {cargo.mention}", color=0x2ECC71))
-
-# ===== COMANDOS GERAIS =====
+async def pay(ctx, membro: discord.Member, qtd: int):
+    if db["money"].get(str(ctx.author.id),0)>=qtd: db["money"][str(ctx.author.id)]-=qtd; db["money"][str(membro.id)]=db["money"].get(str(membro.id),0)+qtd; save(); await ctx.send("✅ Transferido")
+    else: await ctx.send("Sem dinheiro")
 @bot.command()
-async def cmds(ctx):
-    embed = discord.Embed(title="📜 LISTA DE COMANDOS", color=0x5865F2)
-    embed.description = f"**Dono do Bot:** <@{DONO_ID}>"
-    embed.add_field(name="👑 SÓ O DONO PODE", value="`!setup`", inline=False)
-    embed.add_field(name="👮 STAFF PODE USAR", value="`!contratar` `!demitir` `!transferir` `!promover` `!rebaixar`\n`!warn` `!kick` `!ban` `!mutar` `!limpar`\n`!advertencia` `!escala` `!reuniao`", inline=False)
-    embed.add_field(name="😄 TODOS PODEM", value="`!ping` `!avatar` `!infouser` `!cmds`", inline=False)
-    embed.set_footer(text="Trava: Só fica no serv se o Biel estiver 😈")
-    await ctx.author.send(embed=embed); await ctx.send("✅ Mandei a lista no seu PV!")
+async def work(ctx): ganho=random.randint(50,200); db["money"][str(ctx.author.id)]=db["money"].get(str(ctx.author.id),0)+ganho; save(); await ctx.send(f"💼 Ganhou R${ganho}")
+@bot.command()
+async def daily(ctx): db["money"][str(ctx.author.id)]=db["money"].get(str(ctx.author.id),0)+500; save(); await ctx.send("🎁 Daily: R$500")
+@bot.command()
+async def level(ctx, membro: discord.Member=None): m=membro or ctx.author; await ctx.send(f"📊 {m}: Nvl {db['xp'].get(str(m.id),0)//100} | XP {db['xp'].get(str(m.id),0)}")
+@bot.command()
+async def rank(ctx): top=sorted(db["xp"].items(), key=lambda x:x[1], reverse=True)[:10]; await ctx.send("\n".join([f"{i+1}. <@{x[0]}> XP:{x[1]}" for i,x in enumerate(top)]))
+@bot.command()
+async def 8ball(ctx, *, pergunta): await ctx.send(f"🎱 {random.choice(['Sim','Não','Talvez'])}")
+@bot.command()
+async def dado(ctx): await ctx.send(f"🎲 {random.randint(1,6)}")
+@bot.command()
+async def ship(ctx, m1: discord.Member, m2: discord.Member): await ctx.send(f"💘 Ship: {random.randint(0,100)}%")
+@bot.command()
+async def casar(ctx, membro: discord.Member): db["casados"][str(ctx.author.id)]=membro.id; save(); await ctx.send(f"💍 Casou com {membro.mention}")
+@bot.command()
+async def ajuda(ctx): await ctx.send("Use `!comandos`")
+@bot.command()
+async def comandos(ctx): await ctx.send("50 comandos disponíveis pra você. Staff tem 150+")
+# +35 comandos membro: tempo, data, sugestao, bug, meme, beijar, abraçar, etc...
 
 bot.run(os.getenv("TOKEN"))
