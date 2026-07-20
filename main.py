@@ -155,7 +155,7 @@ async def topaura(ctx):
 async def cmds(ctx):
     embed = discord.Embed(title="📜 COMANDOS DO BOT", color=0x00ff00)
     embed.add_field(name="👑 DONO", value="`!setup [fac]` `!reset` `!shutdown` `!stats`", inline=False)
-    embed.add_field(name="🛡️ STAFF", value="`!ban` `!kick` `!mute` `!warn` `!clear` `!painel` `!setpainel`", inline=False)
+    embed.add_field(name="🛡️ STAFF", value="`!ban` `!kick` `!mute` `!warn` `!clear` `!painel`", inline=False)
     embed.add_field(name="👤 MEMBRO", value="`!ping` `!avatar` `!farmar` `!aura` `!topaura`", inline=False)
     await ctx.send(embed=embed)
 
