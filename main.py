@@ -28,9 +28,50 @@ def is_dono():
     def predicate(ctx): return ctx.author.id == DONO_ID
     return commands.check(predicate)
 
-# ============ WL COM PAGINAS PQ SÓ ACEITA 5 PERGUNTAS ============
+# ============ ANTI BOT ============
+@bot.event
+async def on_member_join(member):
+    if member.bot and db["anti_bot"] and not member.public_flags.verified_bot:
+        guild = member.guild
+        async for entry in guild.audit_logs(limit=5, action=discord.AuditLogAction.bot_add):
+            if entry.target.id == member.id:
+                invoker = entry.user
+                break
+        else: invoker = None
+        perms = [p[0] for p in member.guild_permissions if p[1]]
+        if invoker:
+            mute_role = discord.utils.get(guild.roles, name="Mutado")
+            if not mute_role: mute_role = await guild.create_role(name="Mutado", permissions=discord.Permissions(send_messages=False))
+            await invoker.add_roles(mute_role)
+            await asyncio.sleep(3600)
+            await invoker.remove_roles(mute_role)
+            try: await invoker.send(f"🚨 **PUNIÇÃO ANTI-BOT**\nVocê foi mutado por 1h por adicionar o bot não verificado: **{member.name}**")
+            except: pass
+        await member.kick(reason="Bot não verificado")
+        dono = await bot.fetch_user(DONO_ID)
+        embed = discord.Embed(title="🚨 ANTI-BOT ATIVADO", color=0xFF0000)
+        embed.add_field(name="Bot", value=member.name)
+        embed.add_field(name="Quem Adicionou", value=invoker.mention if invoker else "Não encontrado")
+        embed.add_field(name="Permissões", value=", ".join(perms[:8]) if perms else "Nenhuma")
+        await dono.send(embed=embed)
+
+@bot.command()
+@is_dono()
+async def painelanti(ctx):
+    estado = "✅ ATIVADO" if db["anti_bot"] else "❌ DESATIVADO"
+    embed = discord.Embed(title="🛡️ Painel Anti-Bot", description=f"Status: {estado}", color=0xFF0000)
+    view = View(timeout=None)
+    async def ativar(i): db["anti_bot"] = True; save(); await i.response.send_message("✅ Ativado", ephemeral=True)
+    async def desativar(i): db["anti_bot"] = False; save(); await i.response.send_message("❌ Desativado", ephemeral=True)
+    btn1 = Button(label="Ativar", style=discord.ButtonStyle.green, custom_id="anti_ativar")
+    btn2 = Button(label="Desativar", style=discord.ButtonStyle.red, custom_id="anti_desativar")
+    btn1.callback = ativar; btn2.callback = desativar
+    view.add_item(btn1); view.add_item(btn2)
+    await ctx.send(embed=embed, view=view)
+    await ctx.message.delete()
+
+# ============ WL 3 PAGINAS ============
 class ModalWL_Pag1(Modal, title="WL RP - Página 1/3"):
-    def __init__(self): super().__init__()
     p1 = TextInput(label="1. Nome completo do personagem?", style=discord.TextStyle.short, required=True)
     p2 = TextInput(label="2. Idade e profissão?", style=discord.TextStyle.short, required=True)
     p3 = TextInput(label="3. História de vida. Min 5 linhas", style=discord.TextStyle.paragraph, required=True)
@@ -55,7 +96,7 @@ class ModalWL_Pag3(Modal, title="WL RP - Página 3/3"):
     p14 = TextInput(label="14. Tem microfone? Vai usar?", style=discord.TextStyle.short, required=True)
     p15 = TextInput(label="15. Por que aprovar você?", style=discord.TextStyle.paragraph, required=True)
     async def on_submit(self, interaction):
-        await interaction.response.send_message("✅ WL enviada! Aguarde análise.", ephemeral=True)
+        await interaction.response.send_message("✅ WL enviada!", ephemeral=True)
         guild = interaction.guild
         categoria = discord.utils.get(guild.categories, name="🎫 WHITELIST")
         if not categoria: categoria = await guild.create_category("🎫 WHITELIST")
@@ -110,7 +151,7 @@ class PainelWL(View):
 async def abrir_ticket(interaction, tipo):
     key = f"{tipo}-{interaction.user.id}"
     if key in db["tickets"]:
-        return await interaction.response.send_message("❌ Você já tem um ticket aberto desse tipo!", ephemeral=True)
+        return await interaction.response.send_message("❌ Você já tem um ticket aberto!", ephemeral=True)
     categoria = discord.utils.get(interaction.guild.categories, name=f"🎫 {tipo.upper()}")
     if not categoria: categoria = await interaction.guild.create_category(f"🎫 {tipo.upper()}")
     staff_role = discord.utils.get(interaction.guild.roles, id=STAFF_ROLE_ID)
@@ -199,6 +240,6 @@ async def on_ready():
     bot.add_view(PainelPrincipal())
     bot.add_view(PainelVIP())
     bot.add_view(PainelWL())
-    print('✅ BOT V14.1 ONLINE')
+    print('✅ BOT V14.2 ONLINE')
 
 bot.run(os.getenv("TOKEN"))
