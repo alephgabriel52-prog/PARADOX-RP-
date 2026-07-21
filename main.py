@@ -28,15 +28,6 @@ def is_dono():
     def predicate(ctx): return ctx.author.id == DONO_ID
     return commands.check(predicate)
 
-# ============ TEMPLATES CORP ============
-TEMPLATES = {
-    "PM": ["Recruta", "Soldado", "Cabo", "Sargento", "Subtenente", "Tenente", "Capitão", "Major", "Coronel"],
-    "PC": ["Estagiario", "Agente", "Escrivao", "Investigador", "Delegado"],
-    "BOPE": ["Recruta", "Soldado", "Cabo", "Sargento", "Tenente", "Capitao"],
-    "RP": ["Recruta", "Soldado", "Cabo", "Sargento", "Tenente", "Capitao"]
-}
-DIVISOES = ["ROTAM", "ROCAM", "GATE", "CHOQUE"]
-
 # ============ ANTI ROUBO DE SERVIDOR ============
 @bot.event
 async def on_guild_join(guild):
@@ -64,44 +55,11 @@ async def check_servidor(ctx):
         return False
     return True
 
-# ============ SETUP CORP ============
-@bot.command()
-@is_dono()
-async def setup(ctx, corp: str = "PM"):
-    try:
-        corp = corp.upper()
-        if corp not in TEMPLATES:
-            return await ctx.send("❌ Orgs: PM, PC, BOPE, RP")
-        
-        msg = await ctx.send(f"⚡ **INICIANDO SETUP DA {corp}**... Aguarde 1 min")
-        guild = ctx.guild
-
-        cargos_list = ["👑 Alto Comando", "DEV", "Equipe Staff", "Civil", "Staff", "Moderador", "Admin", "Mutado"]
-        for patente in TEMPLATES[corp]:
-            cargos_list.append(f"{patente} {corp}")
-        for div in DIVISOES:
-            cargos_list.append(f"{div} {corp}")
-
-        roles = {}
-        for nome in cargos_list:
-            role = discord.utils.get(guild.roles, name=nome)
-            if not role:
-                role = await guild.create_role(name=nome)
-                await asyncio.sleep(0.6) # Anti 429
-            roles[nome] = role
-
-        categoria = discord.utils.get(guild.categories, name=f"🏛️ {corp}")
-        if not categoria: categoria = await guild.create_category(f"🏛️ {corp}")
-
-        await msg.edit(content=f"✅ **SETUP DA {corp} CONCLUÍDO!** {len(cargos_list)} cargos criados")
-    except Exception as e:
-        await ctx.send(f"❌ ERRO NO SETUP: {e}")
-
-# ============ PAINEIS ============
+# ============ SEUS COMANDOS DE VOLTA ============
 @bot.command()
 @is_dono()
 async def paineldono(ctx):
-    embed = discord.Embed(title="👑 Painel do Dono", description="Controle total", color=0xFFD700)
+    embed = discord.Embed(title="👑 Painel do Dono", description="Controle total do bot", color=0xFFD700)
     await ctx.author.send(embed=embed)
     await ctx.send("✅ Te mandei o painel no PV")
 
@@ -112,6 +70,28 @@ async def painelstaff(ctx):
     embed = discord.Embed(title="🛡️ Painel Staff", description="Painel da equipe", color=0x00FF00)
     await ctx.author.send(embed=embed)
     await ctx.send("✅ Te mandei o painel no PV")
+
+@bot.command()
+@is_dono()
+async def painelloja(ctx):
+    embed = discord.Embed(title="💎 Painel Loja VIP", description="Compras e VIP", color=0x00FF00)
+    await ctx.send(embed=embed)
+    await ctx.message.delete()
+
+@bot.command()
+@is_dono()
+async def painelwl(ctx):
+    embed = discord.Embed(title="📋 Painel WL", description="Whitelist", color=0x5865F2)
+    await ctx.send(embed=embed)
+    await ctx.message.delete()
+
+@bot.command()
+@is_dono()
+async def setstaff(ctx, membro: discord.Member, *, cargo_nome):
+    cargo = discord.utils.get(ctx.guild.roles, name=cargo_nome)
+    if not cargo: cargo = await ctx.guild.create_role(name=cargo_nome)
+    await membro.add_roles(cargo)
+    await ctx.send(f"✅ {membro.mention} recebeu o cargo `{cargo_nome}`")
 
 # ============ TICKET ============
 class PainelTicket(View):
@@ -187,21 +167,13 @@ async def fechar_ticket(interaction, dono_id):
 @bot.command()
 @is_dono()
 async def painel(ctx):
-    embed = discord.Embed(title="🏠 Painel Principal", description="Abra um ticket", color=0x5865F2)
+    embed = discord.Embed(title="🏠 Painel Principal", description="Abra um ticket para atendimento", color=0x5865F2)
     await ctx.send(embed=embed, view=PainelTicket())
     await ctx.message.delete()
-
-@bot.command()
-@is_dono()
-async def setstaff(ctx, membro: discord.Member, *, cargo_nome):
-    cargo = discord.utils.get(ctx.guild.roles, name=cargo_nome)
-    if not cargo: cargo = await ctx.guild.create_role(name=cargo_nome)
-    await membro.add_roles(cargo)
-    await ctx.send(f"✅ {membro.mention} recebeu o cargo `{cargo_nome}`")
 
 @bot.event
 async def on_ready():
     bot.add_view(PainelTicket())
-    print(f'✅ BOT ONLINE V10.1 PRONTO')
+    print(f'✅ BOT ONLINE V11 - SEM SETUP')
 
 bot.run(os.getenv("TOKEN"))
