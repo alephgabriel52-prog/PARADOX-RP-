@@ -26,38 +26,30 @@ def save():
 def is_dono():
     return commands.check(lambda ctx: ctx.author.id == DONO_ID)
 
-# ============ TEMPLATES PESADOS IGUAL MINI CITY ============
+# ============ MESMOS TEMPLATES PESADOS ============
 TEMPLATES = {
     "pmrj": {
         "nome": "PMERJ", "cor": 0x1E3A8A,
         "cargos": [
-            # OFICIAIS GENERAIS
             {"nome": "👑 Coronel PM", "permissoes": discord.Permissions(administrator=True)},
             {"nome": "⭐ Tenente-Coronel PM", "permissoes": discord.Permissions(manage_roles=True, manage_channels=True)},
             {"nome": "🎖️ Major PM", "permissoes": discord.Permissions(manage_roles=True)},
-            # OFICIAIS SUPERIORES
             {"nome": "⚔️ Capitão PM", "permissoes": discord.Permissions(ban_members=True, kick_members=True)},
-            # OFICIAIS INTERMEDIÁRIOS
             {"nome": "🚔 1º Tenente PM", "permissoes": discord.Permissions(kick_members=True, manage_messages=True)},
             {"nome": "🚓 2º Tenente PM", "permissoes": discord.Permissions(kick_members=True, manage_messages=True)},
             {"nome": "🪖 Aspirante-a-Oficial PM", "permissoes": discord.Permissions(manage_messages=True)},
-            # PRAÇAS ESPECIAIS
             {"nome": "🪖 Subtenente PM", "permissoes": discord.Permissions(manage_messages=True)},
-            # SARGENTOS
             {"nome": "🪖 1º Sargento PM", "permissoes": discord.Permissions(manage_messages=True)},
             {"nome": "🪖 2º Sargento PM", "permissoes": discord.Permissions()},
             {"nome": "🪖 3º Sargento PM", "permissoes": discord.Permissions()},
-            # CABOS E SOLDADOS
             {"nome": "👮 Cabo PM", "permissoes": discord.Permissions(mute_members=True)},
             {"nome": "🚨 Soldado 1ª Classe PM", "permissoes": discord.Permissions(send_messages=True, connect=True)},
             {"nome": "🚨 Soldado 2ª Classe PM", "permissoes": discord.Permissions(send_messages=True, connect=True)},
-            # ADJUNTIA
             {"nome": "📋 Adj Comandamento", "permissoes": discord.Permissions(manage_messages=True)},
             {"nome": "📋 Adj Operações", "permissoes": discord.Permissions(manage_messages=True)},
             {"nome": "📋 Adj Pessoal", "permissoes": discord.Permissions()},
             {"nome": "📋 Adj Logística", "permissoes": discord.Permissions()},
             {"nome": "📋 Adj Inteligência", "permissoes": discord.Permissions()},
-            # FORÇAS ESPECIAIS
             {"nome": "🎯 GATE", "permissoes": discord.Permissions()},
             {"nome": "🐕 K9", "permissoes": discord.Permissions()},
             {"nome": "🏍️ ROCAM", "permissoes": discord.Permissions()},
@@ -70,7 +62,6 @@ TEMPLATES = {
             {"nome": "💰 FINANCEIRO", "permissoes": discord.Permissions()},
             {"nome": "🔧 MANUTENÇÃO", "permissoes": discord.Permissions()},
             {"nome": "📡 COMUNICAÇÕES", "permissoes": discord.Permissions()},
-            # CIVIL
             {"nome": "👤 Civil", "permissoes": discord.Permissions(send_messages=True, connect=True)}
         ],
         "categorias": {
@@ -165,63 +156,9 @@ TEMPLATES = {
             "🔒 CV - LOGÍSTICA": ["📦│armas", "💊│drogas", "💰│dinheiro"]
         }
     },
-    "tcp": {
-        "nome": "TCP", "cor": 0x059669,
-        "cargos": [
-            {"nome": "👑 TCP - Dono", "permissoes": discord.Permissions(administrator=True)},
-            {"nome": "💼 TCP - Gerente Geral", "permissoes": discord.Permissions(manage_roles=True)},
-            {"nome": "💼 TCP - Gerente", "permissoes": discord.Permissions(manage_roles=True)},
-            {"nome": "🔫 TCP - Soldado", "permissoes": discord.Permissions()},
-            {"nome": "🔫 TCP - Fogueteiro", "permissoes": discord.Permissions()},
-            {"nome": "🔫 TCP - Olheiro", "permissoes": discord.Permissions()},
-            {"nome": "💊 TCP - Vapor", "permissoes": discord.Permissions()},
-            {"nome": "💰 TCP - LAVADOR", "permissoes": discord.Permissions()},
-            {"nome": "📦 TCP - ESTOQUISTA", "permissoes": discord.Permissions()},
-            {"nome": "🎯 TCP - ATIRADOR", "permissoes": discord.Permissions()},
-            {"nome": "👤 Civil", "permissoes": discord.Permissions()}
-        ],
-        "categorias": {
-            "🟢 TCP - HIERARQUIA": ["📢│avisos-tcp", "💬│chat-gerencia", "💬│chat-soldado", "📋│lista-negra"],
-            "💰 TCP - BOCAS": ["🏪│boca-vg", "🏪│boca-cidade-deus", "🏪│boca-jacare", "🏪│boca-vasco", "📦│estoque", "💰│lavagem"],
-            "⚔️ TCP - GUERRA": ["⚔️│guerra", "📊│caixa", "🎯│ataque"]
-        }
-    },
-    "ada": {
-        "nome": "ADA", "cor": 0x7C3AED,
-        "cargos": [
-            {"nome": "👑 ADA - Dono", "permissoes": discord.Permissions(administrator=True)},
-            {"nome": "💼 ADA - Gerente", "permissoes": discord.Permissions(manage_roles=True)},
-            {"nome": "🔫 ADA - Soldado", "permissoes": discord.Permissions()},
-            {"nome": "🔫 ADA - Fogueteiro", "permissoes": discord.Permissions()},
-            {"nome": "🔫 ADA - Olheiro", "permissoes": discord.Permissions()},
-            {"nome": "💊 ADA - Vapor", "permissoes": discord.Permissions()},
-            {"nome": "💰 ADA - LAVADOR", "permissoes": discord.Permissions()},
-            {"nome": "👤 Civil", "permissoes": discord.Permissions()}
-        ],
-        "categorias": {
-            "🟣 ADA - HIERARQUIA": ["📢│avisos-ada", "💬│chat-gerencia", "💬│chat-soldado"],
-            "💰 ADA - BOCAS": ["🏪│boca-mare", "🏪│boca-penha", "🏪│boca-vila-cruzeiro", "📦│estoque"],
-            "⚔️ ADA - GUERRA": ["⚔️│guerra", "📊│caixa"]
-        }
-    },
-    "pgc": {
-        "nome": "PGC", "cor": 0x1F2937,
-        "cargos": [
-            {"nome": "👑 PGC - Dono", "permissoes": discord.Permissions(administrator=True)},
-            {"nome": "💼 PGC - Gerente", "permissoes": discord.Permissions(manage_roles=True)},
-            {"nome": "🔫 PGC - Soldado", "permissoes": discord.Permissions()},
-            {"nome": "🔫 PGC - Fogueteiro", "permissoes": discord.Permissions()},
-            {"nome": "🔫 PGC - Olheiro", "permissoes": discord.Permissions()},
-            {"nome": "💊 PGC - Vapor", "permissoes": discord.Permissions()},
-            {"nome": "💰 PGC - LAVADOR", "permissoes": discord.Permissions()},
-            {"nome": "👤 Civil", "permissoes": discord.Permissions()}
-        ],
-        "categorias": {
-            "⚫ PGC - HIERARQUIA": ["📢│avisos-pgc", "💬│chat-gerencia", "💬│chat-soldado"],
-            "💰 PGC - BOCAS": ["🏪│boca-vila-cruzeiro", "🏪│boca-parada-de-lucas", "🏪│boca-penha", "📦│estoque"],
-            "⚔️ PGC - GUERRA": ["⚔️│guerra", "📊│caixa"]
-        }
-    },
+    "tcp": {"nome": "TCP", "cor": 0x059669, "cargos": [{"nome": "👑 TCP - Dono", "permissoes": discord.Permissions(administrator=True)}, {"nome": "💼 TCP - Gerente Geral", "permissoes": discord.Permissions(manage_roles=True)}, {"nome": "💼 TCP - Gerente", "permissoes": discord.Permissions(manage_roles=True)}, {"nome": "🔫 TCP - Soldado", "permissoes": discord.Permissions()}, {"nome": "🔫 TCP - Fogueteiro", "permissoes": discord.Permissions()}, {"nome": "🔫 TCP - Olheiro", "permissoes": discord.Permissions()}, {"nome": "💊 TCP - Vapor", "permissoes": discord.Permissions()}, {"nome": "💰 TCP - LAVADOR", "permissoes": discord.Permissions()}, {"nome": "📦 TCP - ESTOQUISTA", "permissoes": discord.Permissions()}, {"nome": "🎯 TCP - ATIRADOR", "permissoes": discord.Permissions()}, {"nome": "👤 Civil", "permissoes": discord.Permissions()}], "categorias": {"🟢 TCP - HIERARQUIA": ["📢│avisos-tcp", "💬│chat-gerencia", "💬│chat-soldado", "📋│lista-negra"], "💰 TCP - BOCAS": ["🏪│boca-vg", "🏪│boca-cidade-deus", "🏪│boca-jacare", "🏪│boca-vasco", "📦│estoque", "💰│lavagem"], "⚔️ TCP - GUERRA": ["⚔️│guerra", "📊│caixa", "🎯│ataque"]}},
+    "ada": {"nome": "ADA", "cor": 0x7C3AED, "cargos": [{"nome": "👑 ADA - Dono", "permissoes": discord.Permissions(administrator=True)}, {"nome": "💼 ADA - Gerente", "permissoes": discord.Permissions(manage_roles=True)}, {"nome": "🔫 ADA - Soldado", "permissoes": discord.Permissions()}, {"nome": "🔫 ADA - Fogueteiro", "permissoes": discord.Permissions()}, {"nome": "🔫 ADA - Olheiro", "permissoes": discord.Permissions()}, {"nome": "💊 ADA - Vapor", "permissoes": discord.Permissions()}, {"nome": "💰 ADA - LAVADOR", "permissoes": discord.Permissions()}, {"nome": "👤 Civil", "permissoes": discord.Permissions()}], "categorias": {"🟣 ADA - HIERARQUIA": ["📢│avisos-ada", "💬│chat-gerencia", "💬│chat-soldado"], "💰 ADA - BOCAS": ["🏪│boca-mare", "🏪│boca-penha", "🏪│boca-vila-cruzeiro", "📦│estoque"], "⚔️ ADA - GUERRA": ["⚔️│guerra", "📊│caixa"]}},
+    "pgc": {"nome": "PGC", "cor": 0x1F2937, "cargos": [{"nome": "👑 PGC - Dono", "permissoes": discord.Permissions(administrator=True)}, {"nome": "💼 PGC - Gerente", "permissoes": discord.Permissions(manage_roles=True)}, {"nome": "🔫 PGC - Soldado", "permissoes": discord.Permissions()}, {"nome": "🔫 PGC - Fogueteiro", "permissoes": discord.Permissions()}, {"nome": "🔫 PGC - Olheiro", "permissoes": discord.Permissions()}, {"nome": "💊 PGC - Vapor", "permissoes": discord.Permissions()}, {"nome": "💰 PGC - LAVADOR", "permissoes": discord.Permissions()}, {"nome": "👤 Civil", "permissoes": discord.Permissions()}], "categorias": {"⚫ PGC - HIERARQUIA": ["📢│avisos-pgc", "💬│chat-gerencia", "💬│chat-soldado"], "💰 PGC - BOCAS": ["🏪│boca-vila-cruzeiro", "🏪│boca-parada-de-lucas", "🏪│boca-penha", "📦│estoque"], "⚔️ PGC - GUERRA": ["⚔️│guerra", "📊│caixa"]}},
     "prf": {"nome": "PRF", "cor": 0x2563EB, "cargos": [{"nome": "👑 Inspetor-Chefe PRF", "permissoes": discord.Permissions(administrator=True)}, {"nome": "🚨 Inspetor PRF", "permissoes": discord.Permissions(manage_roles=True)}, {"nome": "🚔 Agente PRF", "permissoes": discord.Permissions()}, {"nome": "🚔 Agente Especial", "permissoes": discord.Permissions()}, {"nome": "🛣️ FISCALIZAÇÃO", "permissoes": discord.Permissions()}, {"nome": "🚨 BPRV", "permissoes": discord.Permissions()}, {"nome": "👤 Civil", "permissoes": discord.Permissions()}], "categorias": {"🛣️ PRF - GERAL": ["📢│avisos-prf", "📜│regras-prf"], "🚓 PRF - RODOVIAS": ["📡│radio-prf", "🗺️│qth-prf", "🚨│acidentes", "📑│autos-infracao", "🚗│fiscalizacao"], "📁 PRF - ADM": ["📊│relatorios-prf", "🚗│frota"]}},
     "samu": {"nome": "SAMU 192", "cor": 0xEF4444, "cargos": [{"nome": "👑 Diretor SAMU", "permissoes": discord.Permissions(administrator=True)}, {"nome": "👨‍⚕️ Médico Regulador", "permissoes": discord.Permissions(manage_roles=True)}, {"nome": "👨‍⚕️ Médico Intervencionista", "permissoes": discord.Permissions()}, {"nome": "🚑 Enfermeiro", "permissoes": discord.Permissions()}, {"nome": "🚨 Técnico de Enfermagem", "permissoes": discord.Permissions()}, {"nome": "🚨 Condutor Socorrista", "permissoes": discord.Permissions()}, {"nome": "📞 TARM", "permissoes": discord.Permissions()}, {"nome": "👤 Civil", "permissoes": discord.Permissions()}], "categorias": {"🚑 SAMU - GERAL": ["📢│avisos-samu", "📜│regras-samu"], "🏥 SAMU - OPERAÇÕES": ["📡│radio-samu", "🚨│192", "📊│pacientes", "🚑│usa", "🚑│usb", "🏥│hospital"], "📁 SAMU - ADM": ["📝│escala", "📋│relatorios-samu"]}},
     "detran": {"nome": "DETRAN-RJ", "cor": 0xF59E0B, "cargos": [{"nome": "👑 Presidente DETRAN", "permissoes": discord.Permissions(administrator=True)}, {"nome": "📝 Diretor", "permissoes": discord.Permissions(manage_roles=True)}, {"nome": "📝 Agente de Trânsito", "permissoes": discord.Permissions()}, {"nome": "📝 Vistoriador", "permissoes": discord.Permissions()}, {"nome": "📝 Examinador", "permissoes": discord.Permissions()}, {"nome": "👤 Civil", "permissoes": discord.Permissions()}], "categorias": {"🚗 DETRAN - GERAL": ["📢│avisos-detran", "📜│regras-detran"], "📁 DETRAN - ADM": ["📝│cnh", "🚙│veiculos", "📑│multas", "📊│estatistica", "💰│arrecadacao"]}},
@@ -273,40 +210,4 @@ def gerar_nome(desc):
         if key in desc.lower(): return "setup" + key
     return "setup" + str(random.randint(10,99))
 
-def registrar_setup(nome, template_key):
-    async def comando_setup(ctx, t=template_key): await criar_setup(ctx, t)
-    bot.add_command(commands.Command(comando_setup, name=nome))
-
-async def criar_setup(ctx, template_key):
-    t = TEMPLATES[template_key]
-    guild = ctx.guild
-    msg = await ctx.send(f"🏗️ **Montando {t['nome']}**... `0%`")
-    for role in guild.roles:
-        if role.name!= "@everyone" and role.name!= guild.me.name:
-            try: await role.delete()
-            except: pass
-    for channel in guild.channels:
-        try: await channel.delete()
-        except: pass
-    for i, cargo in enumerate(t["cargos"]):
-        await guild.create_role(name=cargo["nome"], permissions=cargo["permissoes"], color=discord.Color(t["cor"]))
-        await msg.edit(content=f"🏗️ **Montando {t['nome']}**... `{int(((i+1)/len(t['cargos']))*50)}%`")
-        await asyncio.sleep(0.1)
-    total = sum(len(c) for c in t["categorias"].values())
-    feito = 0
-    for cat, canais in t["categorias"].items():
-        categoria = await guild.create_category(cat)
-        for canal in canais:
-            await guild.create_text_channel(canal, category=categoria)
-            feito += 1
-            await msg.edit(content=f"🏗️ **Montando {t['nome']}**... `{50 + int((feito/total)*50)}%`")
-            await asyncio.sleep(0.1)
-    await msg.edit(content="", embed=discord.Embed(title=f"✅ {t['nome']} CONFIGURADO", description=f"**{len(t['cargos'])} Cargos** e **{total} Canais** criados\nUse `!painel`", color=t["cor"]))
-
-@bot.event
-async def on_ready():
-    for nome, data in db["comandos_dinamicos"].items():
-        if data["tipo"] == "setup": registrar_setup(nome, data["template"])
-    print(f'✅ BOT V40 ONLINE - SETUP PESADO')
-
-bot.run(os.getenv("TOKEN"))
+def registrar_setup(nome, 
