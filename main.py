@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands
-import os, json, asyncio, random, re
+from discord.ui import View, Button
+import os, json, asyncio, random
 from flask import Flask
 from threading import Thread
 
@@ -25,119 +26,122 @@ def save():
 def is_dono():
     return commands.check(lambda ctx: ctx.author.id == DONO_ID)
 
-# ============ TODOS OS TEMPLATES DA CIDADE ============
+# ============ TODOS OS TEMPLATES + HIERARQUIA ============
 TEMPLATES = {
-    # CORPORAÇÕES
-    "pmrj": {"nome": "PMERJ", "cargos": ["Cel PM", "Ten Cel", "Cap PM", "Sgt PM", "Cb PM", "Sd PM", "Civil"], "categorias": {"🚨 PMERJ": ["avisos-pm", "patrulha", "ocorrencias"]}, "regras": "1. Hierarquia\n2. RP"},
-    "prf": {"nome": "PRF", "cargos": ["PRF - Diretor", "PRF - Inspetor", "PRF - Agente", "Civil"], "categorias": {"🛣️ PRF": ["blitz", "patrulhamento"]}, "regras": "Lei 9.503"},
-    "bope": {"nome": "BOPE", "cargos": ["BOPE - Comandante", "BOPE - Caveira", "Civil"], "categorias": {"💀 BOPE": ["operacoes", "arsenal"]}, "regras": "Elite PM"},
-    "samu": {"nome": "SAMU", "cargos": ["SAMU - Diretor", "SAMU - Médico", "SAMU - Condutor", "Civil"], "categorias": {"🏥 SAMU": ["plantao", "ocorrencias"]}, "regras": "Salvar vidas"},
-    "hospital": {"nome": "HOSPITAL", "cargos": ["HOSP - Diretor", "HOSP - Médico", "HOSP - Enfermeiro", "Civil"], "categorias": {"🏥 HOSPITAL": ["emergencia", "cirurgia"]}, "regras": "Atender todos"},
-    "prefeitura": {"nome": "PREFEITURA", "cargos": ["Prefeito", "Secretário", "Funcionario", "Civil"], "categorias": {"🏛️ PREFEITURA": ["leis", "concursos"]}, "regras": "Cuidar da cidade"},
-    "detran": {"nome": "DETRAN", "cargos": ["DETRAN - Diretor", "DETRAN - Atendente", "DETRAN - Vistoriador", "Civil"], "categorias": {"🚗 DETRAN": ["habilitacao", "vistoria", "multas"]}, "regras": "1. Fazer CNH\n2. Vistoriar veículos"},
-    "bombeiros": {"nome": "BOMBEIROS", "cargos": ["BOMBEIRO - Comandante", "BOMBEIRO - Tenente", "BOMBEIRO - Soldado", "Civil"], "categorias": {"🚒 BOMBEIROS": ["incendio", "resgate", "ocorrencias"]}, "regras": "1. Salvar vidas\n2. Apagar fogo"},
-    "governo": {"nome": "GOVERNO", "cargos": ["Governador", "Vice-Governador", "Ministro", "Assessor", "Civil"], "categorias": {"🏛️ GOVERNO": ["leis-estaduais", "decretos", "gabinete"]}, "regras": "1. Governar estado"},
-    "oab": {"nome": "OAB", "cargos": ["OAB - Presidente", "OAB - Advogado", "OAB - Estagiário", "Civil"], "categorias": {"⚖️ OAB": ["processos", "audiencias", "escritorio"]}, "regras": "1. Defender clientes"},
-    "uber": {"nome": "UBER", "cargos": ["UBER - Gerente", "UBER - Motorista", "Civil"], "categorias": {"🚕 UBER": ["corridas", "suporte-motorista"]}, "regras": "1. Levar passageiro"},
-
-    # FACÇÕES
-    "cv": {"nome": "CV", "cargos": ["CV - Dono", "CV - Gerente", "CV - Soldado", "CV - Vapor", "Civil"], "categorias": {"🔴 CV": ["geral-cv", "vendas", "guerra"]}, "regras": "1. Lealdade\n2. Não x9"},
-    "tcp": {"nome": "TCP", "cargos": ["TCP - Dono", "TCP - Gerente", "TCP - Soldado", "Civil"], "categorias": {"🟢 TCP": ["geral-tcp", "vendas"]}, "regras": "1. Família"},
-    "ada": {"nome": "ADA", "cargos": ["ADA - Dono", "ADA - Gerente", "ADA - Soldado", "Civil"], "categorias": {"🔵 ADA": ["geral-ada", "vendas"]}, "regras": "1. União"},
-    "pcc": {"nome": "PCC", "cargos": ["PCC - Sintonia", "PCC - Gerente", "PCC - Soldado", "Civil"], "categorias": {"⚫ PCC": ["geral-pcc", "vendas", "justica"]}, "regras": "1. Igualdade\n2. Liberdade"},
-    "terceiro": {"nome": "TERCEIRO", "cargos": ["3C - Dono", "3C - Gerente", "3C - Soldado", "Civil"], "categorias": {"⚫ TERCEIRO": ["geral-3c", "vendas"]}, "regras": "1. Negócio"},
-    "milicia": {"nome": "MILÍCIA", "cargos": ["Miliciano - Chefe", "Miliciano - Soldado", "Civil"], "categorias": {"🟡 MILÍCIA": ["geral-milicia", "cobrança"]}, "regras": "1. Proteger área"}
+    "pmrj": {"nome": "PMERJ", "cor": 0x1E3A8A, "cargos": [{"nome": "👑 Cel PM", "permissoes": discord.Permissions(administrator=True)}, {"nome": "⭐ Ten Cel", "permissoes": discord.Permissions(manage_roles=True)}, {"nome": "🎖️ Cap PM", "permissoes": discord.Permissions(ban_members=True)}, {"nome": "🚔 Ten PM", "permissoes": discord.Permissions(kick_members=True)}, {"nome": "🪖 Sgt PM", "permissoes": discord.Permissions(manage_messages=True)}, {"nome": "👮 Cb PM", "permissoes": discord.Permissions(mute_members=True)}, {"nome": "🚨 Sd PM", "permissoes": discord.Permissions()}, {"nome": "👤 Civil", "permissoes": discord.Permissions()}], "categorias": {"📢 PMERJ - INFO": ["📜regras-pm", "📣avisos-pm"], "🚓 PMERJ - HIERARQUIA": ["📡radio-oficial", "📡radio-sgt", "📡radio-sd"], "🚨 PMERJ - OP": ["🚨ocorrencias", "📋bo"], "📁 PMERJ - ADM": ["📑oficios", "🔒arsenal"]}},
+    "bope": {"nome": "BOPE", "cor": 0x000, "cargos": [{"nome": "💀 Ten Cel BOPE", "permissoes": discord.Permissions(administrator=True)}, {"nome": "⚔️ Cap BOPE", "permissoes": discord.Permissions(manage_roles=True)}, {"nome": "🎯 Ten BOPE", "permissoes": discord.Permissions(kick_members=True)}, {"nome": "🪖 Sgt BOPE", "permissoes": discord.Permissions()}, {"nome": "🔫 Cb BOPE", "permissoes": discord.Permissions()}, {"nome": "👤 Civil", "permissoes": discord.Permissions()}], "categorias": {"💀 BOPE - GERAL": ["📢avisos-bope", "📜regras-bope"], "🎯 BOPE - HIERARQUIA": ["📡radio-comando", "📡radio-tropa"], "⚔️ BOPE - OP": ["🚨operações"]}},
+    "pcrj": {"nome": "PCERJ", "cor": 0x4B5563, "cargos": [{"nome": "👑 Delegado Geral", "permissoes": discord.Permissions(administrator=True)}, {"nome": "🕵️ Delegado", "permissoes": discord.Permissions(manage_roles=True)}, {"nome": "🚔 Inspetor", "permissoes": discord.Permissions(kick_members=True)}, {"nome": "📝 Escrivão", "permissoes": discord.Permissions()}, {"nome": "👤 Civil", "permissoes": discord.Permissions()}], "categorias": {"🕵️ PCERJ - INFO": ["📜regras-pc", "📢avisos-pc"], "📁 PCERJ - HIERARQUIA": ["🔍delegacia-geral"], "⚖️ PCERJ - OP": ["📂inqueritos"]}},
+    "prf": {"nome": "PRF", "cor": 0x2563EB, "cargos": [{"nome": "👑 Inspetor Chefe", "permissoes": discord.Permissions(administrator=True)}, {"nome": "🚨 Inspetor", "permissoes": discord.Permissions(manage_roles=True)}, {"nome": "🚔 PRF", "permissoes": discord.Permissions()}, {"nome": "👤 Civil", "permissoes": discord.Permissions()}], "categorias": {"🛣️ PRF - GERAL": ["📢avisos-prf", "📜regras-prf"], "🚓 PRF - HIERARQUIA": ["📡radio-chefia"], "📁 PRF - OP": ["🗺️qth-prf"]}},
+    "samu": {"nome": "SAMU", "cor": 0xEF4444, "cargos": [{"nome": "👑 Diretor SAMU", "permissoes": discord.Permissions(administrator=True)}, {"nome": "👨‍⚕️ Médico", "permissoes": discord.Permissions(manage_roles=True)}, {"nome": "🚑 Enfermeiro", "permissoes": discord.Permissions()}, {"nome": "🚨 Socorrista", "permissoes": discord.Permissions()}, {"nome": "👤 Civil", "permissoes": discord.Permissions()}], "categorias": {"🚑 SAMU - GERAL": ["📢avisos-samu", "📜regras-samu"], "🏥 SAMU - HIERARQUIA": ["📡radio-medico"], "📁 SAMU - OP": ["🚨ocorrencias"]}},
+    "detran": {"nome": "DETRAN", "cor": 0xF59E0B, "cargos": [{"nome": "👑 Presidente", "permissoes": discord.Permissions(administrator=True)}, {"nome": "📝 Agente", "permissoes": discord.Permissions(manage_roles=True)}, {"nome": "👤 Civil", "permissoes": discord.Permissions()}], "categorias": {"🚗 DETRAN - GERAL": ["📢avisos-detran", "📜regras-detran"], "📁 DETRAN - ADM": ["📝cnh"]}},
+    "core": {"nome": "CORE", "cor": 0x374151, "cargos": [{"nome": "👑 Coord CORE", "permissoes": discord.Permissions(administrator=True)}, {"nome": "⚔️ Operador CORE", "permissoes": discord.Permissions(manage_roles=True)}, {"nome": "👤 Civil", "permissoes": discord.Permissions()}], "categorias": {"🖤 CORE - GERAL": ["📢avisos-core", "📜regras-core"], "🎯 CORE - OP": ["🚨operações-core"]}},
+    "bpf": {"nome": "BPF", "cor": 0x166534, "cargos": [{"nome": "👑 Maj BPF", "permissoes": discord.Permissions(administrator=True)}, {"nome": "🌲 Cap BPF", "permissoes": discord.Permissions(manage_roles=True)}, {"nome": "🪖 Sgt BPF", "permissoes": discord.Permissions()}, {"nome": "👤 Civil", "permissoes": discord.Permissions()}], "categorias": {"🌲 BPF - GERAL": ["📢avisos-bpf", "📜regras-bpf"], "🚓 BPF - OP": ["🚨ocorrencias-bpf"]}},
+    "gat": {"nome": "GAT", "cor": 0x991B1B, "cargos": [{"nome": "👑 Coord GAT", "permissoes": discord.Permissions(administrator=True)}, {"nome": "🎯 GAT", "permissoes": discord.Permissions(manage_roles=True)}, {"nome": "👤 Civil", "permissoes": discord.Permissions()}], "categorias": {"🔴 GAT - GERAL": ["📢avisos-gat", "📜regras-gat"], "🎯 GAT - OP": ["🚨ocorrencias-gat"]}},
+    "cv": {"nome": "CV", "cor": 0xDC2626, "cargos": [{"nome": "👑 CV - Dono", "permissoes": discord.Permissions(administrator=True)}, {"nome": "💼 CV - Gerente", "permissoes": discord.Permissions(manage_roles=True)}, {"nome": "🔫 CV - Soldado", "permissoes": discord.Permissions()}, {"nome": "💊 CV - Vapor", "permissoes": discord.Permissions()}, {"nome": "👤 Civil", "permissoes": discord.Permissions()}], "categorias": {"🔴 CV - HIERARQUIA": ["📢avisos-cv", "💬chat-gerencia"], "💰 CV - BOCAS": ["🏪boca-1"], "⚔️ CV - GUERRA": ["⚔️guerra"]}},
+    "tcp": {"nome": "TCP", "cor": 0x059669, "cargos": [{"nome": "👑 TCP - Dono", "permissoes": discord.Permissions(administrator=True)}, {"nome": "💼 TCP - Gerente", "permissoes": discord.Permissions(manage_roles=True)}, {"nome": "🔫 TCP - Soldado", "permissoes": discord.Permissions()}, {"nome": "💊 TCP - Vapor", "permissoes": discord.Permissions()}, {"nome": "👤 Civil", "permissoes": discord.Permissions()}], "categorias": {"🟢 TCP - HIERARQUIA": ["📢avisos-tcp", "💬chat-gerencia"], "💰 TCP - BOCAS": ["🏪boca-1"], "⚔️ TCP - GUERRA": ["⚔️guerra"]}},
+    "ada": {"nome": "ADA", "cor": 0x7C3AED, "cargos": [{"nome": "👑 ADA - Dono", "permissoes": discord.Permissions(administrator=True)}, {"nome": "💼 ADA - Gerente", "permissoes": discord.Permissions(manage_roles=True)}, {"nome": "🔫 ADA - Soldado", "permissoes": discord.Permissions()}, {"nome": "👤 Civil", "permissoes": discord.Permissions()}], "categorias": {"🟣 ADA - HIERARQUIA": ["📢avisos-ada"], "💰 ADA - BOCAS": ["🏪boca-1"], "⚔️ ADA - GUERRA": ["⚔️guerra"]}},
+    "pgc": {"nome": "PGC", "cor": 0x1F2937, "cargos": [{"nome": "👑 PGC - Dono", "permissoes": discord.Permissions(administrator=True)}, {"nome": "💼 PGC - Gerente", "permissoes": discord.Permissions(manage_roles=True)}, {"nome": "🔫 PGC - Soldado", "permissoes": discord.Permissions()}, {"nome": "👤 Civil", "permissoes": discord.Permissions()}], "categorias": {"⚫ PGC - HIERARQUIA": ["📢avisos-pgc"], "💰 PGC - BOCAS": ["🏪boca-1"], "⚔️ PGC - GUERRA": ["⚔️guerra"]}}
 }
 
-# ============ /dono VIA DM ============
+# ============ PAINEL COM BOTÃO ============
+class PainelRegras(View):
+    def __init__(self, cargo_civil):
+        super().__init__(timeout=None)
+        self.cargo_civil = cargo_civil
+
+    @discord.ui.button(label="✅ Aceitar Regras", style=discord.ButtonStyle.green, emoji="✅", custom_id="aceitar_regras")
+    async def aceitar(self, interaction: discord.Interaction, button: Button):
+        await interaction.user.add_roles(self.cargo_civil)
+        await interaction.response.send_message("✅ Você aceitou as regras! Cargo liberado.", ephemeral=True)
+
+@bot.command()
+async def painel(ctx):
+    """Cria o painel de regras"""
+    cargo_civil = discord.utils.get(ctx.guild.roles, name="👤 Civil")
+    if not cargo_civil:
+        return await ctx.send("❌ Cargo `👤 Civil` não encontrado. Rode o!setup primeiro.")
+
+    embed = discord.Embed(
+        title="📜 REGRAS DO SERVIDOR",
+        description="**1.** Respeite todos\n**2.** Sem racismo/homofobia\n**3.** Sem divulgar\n**4.** RP sempre\n**5.** Siga a hierarquia\n\nClique no botão abaixo para liberar o acesso!",
+        color=0x2B2D31
+    )
+    embed.set_footer(text="Bot Criado por Biel")
+
+    view = PainelRegras(cargo_civil)
+    await ctx.send(embed=embed, view=view)
+
+# ============ /dono EM 3s ============
 @bot.command(name="dono")
 @is_dono()
 async def dono(ctx, *, descricao=None):
     if not isinstance(ctx.channel, discord.DMChannel):
         return await ctx.send("❌ Use no meu privado")
     if not descricao:
-        return await ctx.send("❌ Ex: `!dono crie um comando de setup do detran`")
+        return await ctx.send("❌ Ex: `!dono crie um comando de setup do core`")
 
-    await ctx.send("🤖 Criando em 10 segundos...")
-    await asyncio.sleep(10)
+    await ctx.send("⚡ Criando em **3 segundos**...")
+    await asyncio.sleep(3)
 
     nome = gerar_nome(descricao)
     encontrado = None
     for key in TEMPLATES:
-        if key in descricao.lower():
-            encontrado = key
-            break
+        if key in descricao.lower(): encontrado = key; break
 
     if encontrado:
         db["comandos_dinamicos"][nome] = {"tipo": "setup", "template": encontrado}
         save()
         registrar_setup(nome, encontrado)
         t = TEMPLATES[encontrado]
-        return await ctx.send(f"✅ **PRONTO CHEFE!**\nComando: `!{nome}`\nTemplate: **{t['nome']}**")
-
-    resposta = gerar_resposta_ia(descricao)
-    db["comandos_dinamicos"][nome] = {"tipo": "normal", "resposta": resposta}
-    save()
-    registrar_normal(nome, resposta)
-    await ctx.send(f"✅ **PRONTO CHEFE!**\nComando: `!{nome}`")
+        embed = discord.Embed(title="✅ COMANDO CRIADO", description=f"Use: `!{nome}`\nOrg: {t['nome']}", color=t["cor"])
+        await ctx.send(embed=embed)
+    else:
+        orgs = ", ".join(TEMPLATES.keys())
+        await ctx.send(f"❌ Org não encontrada. Temos: {orgs}")
 
 def gerar_nome(desc):
     for key in TEMPLATES:
         if key in desc.lower(): return "setup" + key
-    palavras = re.findall(r'\w+', desc.lower())
-    for p in palavras:
-        if p not in ["crie","comando","que"] and len(p)>3: return p
-    return "cmd"+str(random.randint(10,99))
-
-def gerar_resposta_ia(desc):
-    if "avisa" in desc: return "⚠️ {membro} {args}"
-    if "ban" in desc: return "🔨 {membro} banido. Motivo: {args}"
-    return f"✅ {desc}"
+    return "setup" + str(random.randint(10,99))
 
 def registrar_setup(nome, template_key):
     async def comando_setup(ctx, t=template_key):
         await criar_setup(ctx, t)
     bot.add_command(commands.Command(comando_setup, name=nome))
 
-def registrar_normal(nome, resposta):
-    async def comando_dinamico(ctx, *, args=None, r=resposta, n=nome):
-        resp = r.replace("{membro}", ctx.author.mention).replace("{args}", args if args else "")
-        await ctx.send(resp)
-        dono = bot.get_user(DONO_ID)
-        if dono: await dono.send(f"📊 `!{n}` usado por {ctx.author}")
-    bot.add_command(commands.Command(comando_dinamico, name=nome))
-
 async def criar_setup(ctx, template_key):
     t = TEMPLATES[template_key]
     guild = ctx.guild
-    await ctx.send(f"🏗️ Criando **{t['nome']}**...")
+    msg = await ctx.send(f"🏗️ **Montando {t['nome']}**... `0%`")
 
-    for cargo in t["cargos"]:
-        await guild.create_role(name=cargo)
-        await asyncio.sleep(0.2)
+    for role in guild.roles:
+        if role.name!= "@everyone" and role.name!= guild.me.name:
+            try: await role.delete()
+    for channel in guild.channels:
+        try: await channel.delete()
 
+    for i, cargo in enumerate(t["cargos"]):
+        await guild.create_role(name=cargo["nome"], permissions=cargo["permissoes"], color=discord.Color(t["cor"]))
+        porcentagem = int(((i+1)/len(t["cargos"]))*50)
+        await msg.edit(content=f"🏗️ **Montando {t['nome']}**... `{porcentagem}%`")
+
+    total = sum(len(c) for c in t["categorias"].values())
+    feito = 0
     for cat, canais in t["categorias"].items():
         categoria = await guild.create_category(cat)
         for canal in canais:
             await guild.create_text_channel(canal, category=categoria)
-            await asyncio.sleep(0.1)
+            feito += 1
+            porcentagem = 50 + int((feito/total)*50)
+            await msg.edit(content=f"🏗️ **Montando {t['nome']}**... `{porcentagem}%`")
 
-    await ctx.send(f"✅ **{t['nome']} CRIADO!**")
+    embed = discord.Embed(title=f"✅ {t['nome']} CONFIGURADO", description="Agora use `!painel` para criar o painel de regras", color=t["cor"])
+    await msg.edit(content="", embed=embed)
 
 @bot.event
 async def on_ready():
     for nome, data in db["comandos_dinamicos"].items():
-        if data["tipo"] == "setup":
-            registrar_setup(nome, data["template"])
-        else:
-            registrar_normal(nome, data["resposta"])
-    print(f'✅ BOT V24 ONLINE - {len(TEMPLATES)} templates carregados')
-
-@bot.command()
-@is_dono()
-async def listacomandos(ctx):
-    if not isinstance(ctx.channel, discord.DMChannel): return
-    txt = "\n".join([f"!{k} - {TEMPLATES[v['template']]['nome']}" for k,v in db["comandos_dinamicos"].items() if v['tipo']=='setup'])
-    await ctx.send(f"**📜 SETUPS CRIADOS**\n{txt}")
+        if data["tipo"] == "setup": registrar_setup(nome, data["template"])
+    print(f'✅ BOT V31 ONLINE - 13 ORGS + PAINEL')
 
 bot.run(os.getenv("TOKEN"))
