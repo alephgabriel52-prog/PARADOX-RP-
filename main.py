@@ -71,8 +71,8 @@ TEMPLATES = {
             "🎯 PMERJ - FORÇAS ESPECIAIS": ["🎯│gate", "🐕│k9", "🏍️│rocam", "🚁│aeropol", "🚤│gpaer"],
             "💬 PMERJ - GERAL": ["💬│chat-geral", "📸│midias", "🎮│sugestoes", "🎤│reunioes"]
         }
-    },
-    # COPIA OS OUTROS 12 AQUI... BOPE, PC, CV, TCP, ETC. DEIXEI SÓ PM PRA NAO FICAR GIGANTE
+    }
+    # COPIA OS OUTROS 12 AQUI
 }
 
 class PainelRegras(View):
@@ -125,59 +125,74 @@ async def criar_setup(ctx, template_key):
     guild = ctx.guild
     me = guild.me
 
-    # TESTE DE PERMISSAO ANTES DE APAGAR TUDO
     if not me.guild_permissions.administrator:
-        return await ctx.send("❌ **SEM PERMISSÃO**\nMe dá cargo `Administrador` e me coloca no topo da lista de cargos!")
+        return await ctx.send("❌ **ME DA ADMIN**\nConfig do Servidor > Cargos > 00 com aura > Administrador")
 
-    msg = await ctx.send(f"🏗️ **Montando {t['nome']}**... `0%`")
+    msg = await ctx.send(f"🏗️ **Montando {t['nome']}**... `0%`\nApagando coisas antigas...")
 
-    # DELETAR
+    # 1. APAGAR TUDO
     for role in guild.roles:
-        if role.name!= "@everyone" and role.name!= me.name:
-            try: await role.delete(reason="Setup")
+        if role.name!= "@everyone" and role.name!= me.name and role.position < me.top_role.position:
+            try: await role.delete()
             except: pass
     await asyncio.sleep(2)
 
     for channel in guild.channels:
-        try: await channel.delete(reason="Setup")
+        try: await channel.delete()
         except: pass
     await asyncio.sleep(2)
 
-    # CRIAR CARGOS
+    await msg.edit(content=f"🏗️ **Montando {t['nome']}**... `10%`\nCriando {len(t['cargos'])} cargos...")
+
+    # 2. CRIAR CARGOS COM DELAY MAIOR
+    criados = 0
     for i, cargo in enumerate(t["cargos"]):
         try:
-            await guild.create_role(name=cargo["nome"], permissions=cargo["permissoes"], color=discord.Color(t["cor"]), reason="Setup")
-        except Exception as e:
-            await ctx.send(f"❌ Erro ao criar cargo {cargo['nome']}: {e}")
-        porcentagem = int(((i+1)/len(t["cargos"]))*50)
-        await msg.edit(content=f"🏗️ **Montando {t['nome']}**... `{porcentagem}%`")
-        await asyncio.sleep(0.5)
+            await guild.create_role(name=cargo["nome"], permissions=cargo["permissoes"], color=discord.Color(t["cor"]))
+            criados += 1
+        except discord.Forbidden:
+            await ctx.send(f"❌ Sem permissão pra criar cargo: {cargo['nome']}")
+            return
+        except discord.HTTPException as e:
+            await ctx.send(f"❌ Rate limit. Aguarde 5s...")
+            await asyncio.sleep(5)
+            await guild.create_role(name=cargo["nome"], permissions=cargo["permissoes"], color=discord.Color(t["cor"]))
+            criados += 1
+        
+        porcentagem = 10 + int(((i+1)/len(t["cargos"]))*40)
+        await msg.edit(content=f"🏗️ **Montando {t['nome']}**... `{porcentagem}%`\nCargos: {criados}/{len(t['cargos'])}")
+        await asyncio.sleep(1) # DELAY DE 1s PRA NAO TOMAR RATE LIMIT
 
-    # CRIAR CANAIS
+    await msg.edit(content=f"🏗️ **Montando {t['nome']}**... `50%`\nCriando {sum(len(c) for c in t['categorias'].values())} canais...")
+
+    # 3. CRIAR CANAIS COM DELAY MAIOR
     total = sum(len(c) for c in t["categorias"].values())
     feito = 0
     for cat_nome, canais in t["categorias"].items():
         try:
-            categoria = await guild.create_category(cat_nome, reason="Setup")
-        except Exception as e:
-            await ctx.send(f"❌ Erro ao criar categoria {cat_nome}: {e}")
-            continue
+            categoria = await guild.create_category(cat_nome)
+        except:
+            await asyncio.sleep(2)
+            categoria = await guild.create_category(cat_nome)
+        
         for canal_nome in canais:
             try:
-                await guild.create_text_channel(canal_nome, category=categoria, reason="Setup")
-            except Exception as e:
-                await ctx.send(f"❌ Erro ao criar canal {canal_nome}: {e}")
+                await guild.create_text_channel(canal_nome, category=categoria)
+            except:
+                await asyncio.sleep(2)
+                await guild.create_text_channel(canal_nome, category=categoria)
+            
             feito += 1
             porcentagem = 50 + int((feito/total)*50)
-            await msg.edit(content=f"🏗️ **Montando {t['nome']}**... `{porcentagem}%`")
-            await asyncio.sleep(0.5)
+            await msg.edit(content=f"🏗️ **Montando {t['nome']}**... `{porcentagem}%`\nCanais: {feito}/{total}")
+            await asyncio.sleep(1) # DELAY DE 1s
 
-    await msg.edit(content="", embed=discord.Embed(title=f"✅ {t['nome']} CONFIGURADO", description=f"**{len(t['cargos'])} Cargos** e **{total} Canais** criados\nUse `!painel`", color=t["cor"]))
+    await msg.edit(content="", embed=discord.Embed(title=f"✅ {t['nome']} CONFIGURADO", description=f"**{criados} Cargos** e **{feito} Canais** criados\nUse `!painel`", color=t["cor"]))
 
 @bot.event
 async def on_ready():
     for nome, data in db["comandos_dinamicos"].items():
         if data["tipo"] == "setup": registrar_setup(nome, data["template"])
-    print(f'✅ BOT V43 ONLINE')
+    print(f'✅ BOT V44 ONLINE')
 
 bot.run(os.getenv("TOKEN"))
