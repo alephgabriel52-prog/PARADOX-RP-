@@ -19,9 +19,30 @@ try: db = json.load(open(ARQUIVO,'r',encoding='utf-8'))
 except: db = {"config":{}, "tickets":{}, "whitelist":{}}
 def save(): json.dump(db, open(ARQUIVO,'w',encoding='utf-8'), ensure_ascii=False, indent=4)
 
-OWNER_ID = 0 # 1438010935783460954
+OWNER_ID = 1438010935783460954 # SEU ID
 
-PERGUNTAS_RP = ["1. O que é RDM?", "2. O que é VDM?", "3. O que é Meta Gaming?", "4. O que é Power Gaming?", "5. O que é Combat Log?","6. O que fazer em sequestro?", "7. Pode atirar de carro?", "8. O que é Fear RP?", "9. Como agir em assalto?", "10. O que é Favorecimento?","11. Pode roubar polícia?", "12. O que é Anti RP?", "13. Idade mínima facção?", "14. O que fazer se tomar DM?", "15. O que é Gatilho?","16. Pode usar info do Discord no jogo?", "17. O que é Coerência?", "18. O que fazer em abordagem?", "19. Por que que entra em nosso rp?", "20. Descreva um RP"]
+PERGUNTAS_RP = [
+"1. O que é RDM?", 
+"2. O que é VDM?", 
+"3. O que é Meta Gaming?", 
+"4. O que é Power Gaming?", 
+"5. O que é Combat Log?",
+"6. O que fazer em sequestro?", 
+"7. Pode atirar de carro?", 
+"8. O que é Fear RP?", 
+"9. Como agir em assalto?", 
+"10. O que é Favorecimento?",
+"11. Pode roubar polícia?", 
+"12. O que é Anti RP?", 
+"13. Idade mínima facção?", 
+"14. O que fazer se tomar DM?", 
+"15. O que é Gatilho?",
+"16. Pode usar info do Discord no jogo?", 
+"17. O que é Coerência?", 
+"18. O que fazer em abordagem?", 
+"19. Por que você quer entrar em nosso RP? Resposta mínima 10 linhas.", 
+"20. Descreva um RP completo"
+]
 
 # TICKET
 class TicketPainel(View):
@@ -76,10 +97,10 @@ class WhitelistEtapa4(Modal):
     r1=TextInput(label=PERGUNTAS_RP[15]); r2=TextInput(label=PERGUNTAS_RP[16]); r3=TextInput(label=PERGUNTAS_RP[17]); r4=TextInput(label=PERGUNTAS_RP[18]); r5=TextInput(label=PERGUNTAS_RP[19])
     async def on_submit(self, i):
         db["whitelist"][str(self.uid)]["e4"]=[self.r1.value,self.r2.value,self.r3.value,self.r4.value,self.r5.value]; save()
-        if db["config"].get("whitelist_canal"): await bot.get_channel(db["config"]["whitelist_canal"]).send(f"📝 Nova: {i.user.mention}")
-        await i.response.send_message("✅ Enviada!", ephemeral=True)
+        if db["config"].get("whitelist_canal"): await bot.get_channel(db["config"]["whitelist_canal"]).send(f"📝 Nova Whitelist: {i.user.mention}")
+        await i.response.send_message("✅ Enviada para análise!", ephemeral=True)
 
-# ============ 90 COMANDOS ÚNICOS ============
+# ============ 90 COMANDOS ============
 def cmd(nome, desc):
     @app_commands.command(name=nome, description=desc)
     async def command(interaction: discord.Interaction, membro: discord.Member = None, motivo: str = "Sem motivo", q: int = 10):
@@ -126,6 +147,6 @@ async def whitelist(i: discord.Interaction):
 @bot.event
 async def on_ready():
     await bot.tree.sync()
-    print(f'✅ V62 ONLINE - 94 COMANDOS CARREGADOS')
+    print(f'✅ V63 ONLINE - OWNER: {OWNER_ID}')
 
 bot.run(os.getenv("TOKEN"))
