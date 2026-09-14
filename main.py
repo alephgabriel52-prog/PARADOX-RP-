@@ -8,7 +8,7 @@ from threading import Thread
 
 app = Flask('')
 @app.route('/')
-def home(): return "Bot Online"
+def home(): return "Bot Online V81"
 Thread(target=lambda: app.run(host='0.0.0.0', port=8080)).start()
 
 intents = discord.Intents.all()
@@ -20,7 +20,7 @@ except: db = {"config":{}, "tickets":{}, "whitelist":{}, "warns":{}}
 def save(): json.dump(db, open(ARQUIVO,'w',encoding='utf-8'), ensure_ascii=False, indent=4)
 
 OWNER_ID = 1438010935783460954
-GUILD_ID = 1526291625763143770
+GUILD_ID = 1526291625763143770 # ID DO SEU SERVER JÁ COLADO
 
 BANNER_SUPORTE = "https://cdn.discordapp.com/attachments/1481856611587723295/1549067503588606033/file_00000136881f58a07836a66e4246c.png?ex=6aa95909&is=6aa80789&hm=bdc18d543ecb36c4417854a67c81826d27438297b74e41549a177b1843797a43"
 BANNER_BOT = "https://cdn.discordapp.com/attachments/1481856611587723295/1549067503890866176/IMG_20260914_111956.jpg?ex=6aa95909&is=6aa80789&hm=e56e7317913f32b44715d63482cabc005132d429ed7e0eb7a61f7ab3c2e56181"
@@ -36,8 +36,10 @@ class TicketSelect(Select):
         ]
         super().__init__(placeholder="Selecione o motivo do seu ticket", min_values=1, max_values=1, options=options)
     async def callback(self, interaction: discord.Interaction): await interaction.response.send_modal(TicketMotivo(self.values[0]))
+
 class TicketPainel(View):
     def __init__(self): super().__init__(timeout=None); self.add_item(TicketSelect())
+
 class TicketAcoes(View):
     def __init__(self, user_id, tipo): super().__init__(timeout=None); self.user_id = user_id; self.tipo = tipo
     @discord.ui.button(label="✅ Assumir", style=discord.ButtonStyle.green)
@@ -50,15 +52,17 @@ class TicketAcoes(View):
         await i.response.send_message(f"✅ Assumido por {i.user.mention}")
     @discord.ui.button(label="🔒 Fechar", style=discord.ButtonStyle.red)
     async def fechar(self, i, b): await i.response.send_modal(FecharMotivo(self.user_id, i.channel.id, self.tipo))
+
 class FecharMotivo(Modal, title="Fechar Ticket"):
     motivo = TextInput(label="Motivo", style=discord.TextStyle.paragraph)
-    def __init__(self, user_id, cid, tipo): self.user_id=user_id; self.cid=cid; self.tipo=tipo
+    def __init__(self, user_id, cid, tipo): super().__init__(); self.user_id=user_id; self.cid=cid; self.tipo=tipo
     async def on_submit(self, i):
         user = await bot.fetch_user(self.user_id); await user.send(f"🔒 Fechado. Motivo: {self.motivo.value}")
         msgs = [f"[{m.created_at.strftime('%d/%m %H:%M')}] {m.author.name}: {m.content}" async for m in i.channel.history(limit=500)]
         file = discord.File(io.BytesIO("\n".join(reversed(msgs)).encode()), filename=f"ticket-{self.cid}.txt")
         if db["config"].get("transcript_canal"): await bot.get_channel(db["config"]["transcript_canal"]).send(f"📁 Repositório - {self.tipo}", file=file)
         await i.response.send_message("Fechando..."); await asyncio.sleep(3); await i.channel.delete()
+
 class TicketMotivo(Modal):
     def __init__(self, tipo): super().__init__(title=f"Ticket: {tipo}"); self.tipo=tipo
     motivo = TextInput(label="Descreva", style=discord.TextStyle.paragraph)
@@ -76,6 +80,7 @@ class TicketMotivo(Modal):
 class WhitelistPainel(View):
     @discord.ui.button(label="📝 Fazer Whitelist", style=discord.ButtonStyle.success)
     async def fazer(self, i, b): await i.response.send_modal(WhitelistEtapa1())
+
 class WhitelistEtapa1(Modal, title="Whitelist 1/4"):
     r1=TextInput(label="1. O que é RDM?"); r2=TextInput(label="2. O que é VDM?"); r3=TextInput(label="3. Meta Gaming?"); r4=TextInput(label="4. Power Gaming?"); r5=TextInput(label="5. Combat Log?")
     async def on_submit(self, i): db["whitelist"][str(i.user.id)]={"e1":[self.r1.value,self.r2.value,self.r3.value,self.r4.value,self.r5.value]}; save(); await i.response.send_modal(WhitelistEtapa2(i.user.id))
@@ -123,14 +128,14 @@ async def ticket(i: discord.Interaction):
     embed.set_image(url=BANNER_SUPORTE)
     embed.set_footer(text=bot.user.name, icon_url=BANNER_BOT)
     await i.channel.send(embed=embed, view=TicketPainel())
-    await i.response.send_message("✅ Enviado", ephemeral=True)
+    await i.response.send_message("✅ Painel enviado", ephemeral=True)
 
 @bot.tree.command(name="whitelist", guild=discord.Object(id=GUILD_ID))
 async def whitelist(i: discord.Interaction):
     embed = discord.Embed(title="📝 WHITELIST", color=0x57F287)
     embed.set_image(url=BANNER_BOT)
     await i.channel.send(embed=embed, view=WhitelistPainel())
-    await i.response.send_message("✅ Enviado", ephemeral=True)
+    await i.response.send_message("✅ Painel enviado", ephemeral=True)
 
 @bot.tree.command(name="warn", guild=discord.Object(id=GUILD_ID))
 @is_staff()
@@ -183,8 +188,8 @@ async def antiraid(i: discord.Interaction, ativo: bool):
 @bot.event
 async def on_ready():
     guild = discord.Object(id=GUILD_ID)
-    bot.tree.clear_commands(guild=guild)
-    await bot.tree.sync(guild=guild)
-    print(f'✅ V80 ONLINE - COMANDOS FORÇADOS NO SERVER 1526291625763143770')
+    bot.tree.clear_commands(guild=guild) # LIMPA TUDO ANTIGO
+    await bot.tree.sync(guild=guild) # FORÇA SYNC SÓ NESSE SERVER
+    print(f'✅ V81 ONLINE - ID: {GUILD_ID} - COMANDOS FORÇADOS')
 
 bot.run(os.getenv("TOKEN"))
