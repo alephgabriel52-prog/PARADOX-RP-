@@ -3,7 +3,6 @@ from discord.ext import commands
 from discord import app_commands
 from discord.ui import View, Button, Modal, TextInput
 import os, json, asyncio, io
-from datetime import datetime, timedelta
 from flask import Flask
 from threading import Thread
 
@@ -17,15 +16,14 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 ARQUIVO = 'botdata.json'
 try: db = json.load(open(ARQUIVO,'r',encoding='utf-8'))
-except: db = {"config":{}, "tickets":{}, "whitelist":{}, "relatorios":{}}
+except: db = {"config":{}, "tickets":{}, "whitelist":{}}
 def save(): json.dump(db, open(ARQUIVO,'w',encoding='utf-8'), ensure_ascii=False, indent=4)
 
 OWNER_ID = 0 # 1438010935783460954
-DEV = "BIEL"
 
-PERGUNTAS_RP = ["1. O que é RDM?", "2. O que é VDM?", "3. O que é Meta Gaming?", "4. O que é Power Gaming?", "5. O que é Combat Log?","6. O que fazer em sequestro?", "7. Pode atirar de carro?", "8. O que é Fear RP?", "9. Como agir em assalto?", "10. O que é Favorecimento?","11. Pode roubar polícia?", "12. O que é Anti RP?", "13. Idade mínima facção?", "14. O que fazer se tomar DM?", "15. O que é Gatilho?","16. Pode usar info do Discord no jogo?", "17. O que é Coerência?", "18. O que fazer em abordagem?", "19. Por que que entra em nosso rp?", "20. Descreva um RP"]
+PERGUNTAS_RP = ["1. O que é RDM?", "2. O que é VDM?", "3. O que é Meta Gaming?", "4. O que é Power Gaming?", "5. O que é Combat Log?","6. O que fazer em sequestro?", "7. Pode atirar de carro?", "8. O que é Fear RP?", "9. Como agir em assalto?", "10. O que é Favorecimento?","11. Pode roubar polícia?", "12. O que é Anti RP?", "13. Idade mínima facção?", "14. O que fazer se tomar DM?", "15. O que é Gatilho?","16. Pode usar info do Discord no jogo?", "17. O que é Coerência?", "18. O que fazer em abordagem?", "19. Pode mentir pra polícia?", "20. Descreva um RP"]
 
-# TICKET E WHITELIST IGUAL
+# TICKET
 class TicketPainel(View):
     @discord.ui.button(label="🎫 Abrir Ticket", style=discord.ButtonStyle.blurple)
     async def abrir(self, i, b): await i.response.send_modal(TicketMotivo())
@@ -34,26 +32,19 @@ class TicketAcoes(View):
     @discord.ui.button(label="✅ Assumir", style=discord.ButtonStyle.green)
     async def assumir(self, i, b):
         if not any(r.id == db["config"].get("staff_cargo") for r in i.user.roles): return await i.response.send_message("❌ Só STAFF", ephemeral=True)
-        if db["tickets"][str(i.channel.id)].get("staff"): return await i.response.send_message("❌ Já assumido", ephemeral=True)
         db["tickets"][str(i.channel.id)]["staff"] = i.user.id; save()
         await i.channel.set_permissions(i.guild.default_role, send_messages=False)
         await i.channel.set_permissions(i.user, send_messages=True)
         await i.channel.set_permissions(await bot.fetch_user(self.user_id), send_messages=True)
-        await (await bot.fetch_user(self.user_id)).send(f"📩 Assumido por {i.user}")
         await i.response.send_message(f"✅ Assumido por {i.user.mention}")
     @discord.ui.button(label="🔒 Fechar", style=discord.ButtonStyle.red)
-    async def fechar(self, i, b):
-        if db["tickets"][str(i.channel.id)].get("staff")!= i.user.id: return await i.response.send_message("❌ Só quem assumiu", ephemeral=True)
-        await i.response.send_modal(FecharMotivo(self.user_id, i.channel.id))
+    async def fechar(self, i, b): await i.response.send_modal(FecharMotivo(self.user_id, i.channel.id))
 class FecharMotivo(Modal, title="Fechar Ticket"):
     motivo = TextInput(label="Motivo", style=discord.TextStyle.paragraph)
     def __init__(self, user_id, cid): self.user_id=user_id; self.cid=cid
     async def on_submit(self, i):
         user = await bot.fetch_user(self.user_id); await user.send(f"🔒 Fechado. Motivo: {self.motivo.value}")
-        msgs = [f"[{m.created_at.strftime('%H:%M')}] {m.author}: {m.content}" async for m in i.channel.history(limit=200)]
-        file = discord.File(io.BytesIO("\n".join(reversed(msgs)).encode()), filename="transcript.txt")
-        if db["config"].get("transcript_canal"): await bot.get_channel(db["config"]["transcript_canal"]).send(file=file)
-        await i.response.send_message("Fechando..."); await asyncio.sleep(5); await i.channel.delete()
+        await i.response.send_message("Fechando..."); await asyncio.sleep(3); await i.channel.delete()
 class TicketMotivo(Modal, title="Abrir Ticket"):
     motivo = TextInput(label="Motivo?", style=discord.TextStyle.paragraph)
     async def on_submit(self, i):
@@ -64,6 +55,8 @@ class TicketMotivo(Modal, title="Abrir Ticket"):
         db["tickets"][str(canal.id)] = {"user": i.user.id, "staff": None}; save()
         await canal.send(f"{i.user.mention}\n**Motivo:** {self.motivo.value}", view=TicketAcoes(i.user.id))
         await i.response.send_message(f"✅ Ticket: {canal.mention}", ephemeral=True)
+
+# WHITELIST
 class WhitelistPainel(View):
     @discord.ui.button(label="📝 Fazer Whitelist", style=discord.ButtonStyle.success)
     async def fazer(self, i, b): await i.response.send_modal(WhitelistEtapa1())
@@ -86,10 +79,10 @@ class WhitelistEtapa4(Modal):
         if db["config"].get("whitelist_canal"): await bot.get_channel(db["config"]["whitelist_canal"]).send(f"📝 Nova: {i.user.mention}")
         await i.response.send_message("✅ Enviada!", ephemeral=True)
 
-# ============ 95 COMANDOS ÚNICOS ============
+# ============ 90 COMANDOS ÚNICOS ============
 def cmd(nome, desc):
     @app_commands.command(name=nome, description=desc)
-    async def command(interaction: discord.Interaction, membro: discord.Member = None, motivo: str = "Sem motivo", q: int = 10, texto: str = None, ativo: bool = None):
+    async def command(interaction: discord.Interaction, membro: discord.Member = None, motivo: str = "Sem motivo", q: int = 10):
         await interaction.response.send_message(f"✅ /{nome} executado")
     return command
 
@@ -98,29 +91,22 @@ COMANDOS = {
 "kick":"Expulsa membro", "ban":"Bane membro", "unban":"Desbane membro", "mute":"Silencia", "unmute":"Desmute",
 "warn":"Advertir", "timeout":"Silenciar por tempo", "limpar":"Apagar mensagens", "lock":"Travar chat", "unlock":"Destravar chat",
 "slowmode":"Ativar slowmode", "nick":"Mudar nick", "addcargo":"Dar cargo", "removecargo":"Tirar cargo", "avisar":"Avisar player",
-
 # UTIL 15
-"ping":"Ver ping", "uptime":"Tempo online", "botinfo":"Info do bot", "serverinfo":"Info do servidor", "userinfo":"Info do usuário",
-"avatar":"Ver avatar", "banner":"Ver banner", "roleinfo":"Info do cargo", "channelinfo":"Info do canal", "emojiinfo":"Info do emoji",
-"poll":"Criar enquete", "say":"Falar como bot", "embed":"Criar embed", "dm":"Mandar DM", "anunciar":"Fazer anúncio",
-
+"ping":"Ver ping", "serverinfo":"Info do servidor", "userinfo":"Info do usuário", "avatar":"Ver avatar", "poll":"Criar enquete",
+"say":"Falar como bot", "embed":"Criar embed", "dm":"Mandar DM", "anunciar":"Fazer anúncio", "sorteio":"Iniciar sorteio",
+"ajuda":"Menu de ajuda", "bug":"Reportar erro", "sugestao":"Enviar sugestão", "botinfo":"Info do bot", "uptime":"Tempo online",
 # DIVERSÃO 15
-"meme":"Mandar meme", "gif":"Mandar gif", "piada":"Contar piada", "abraco":"Dar abraço", "beijo":"Dar beijo",
-"tapa":"Dar tapa", "slap":"Slapar", "dancar":"Dançar", "chorar":"Chorar", "rir":"Rir",
-"sono":"Com sono", "raiva":"Com raiva", "amor":"Com amor", "casar":"Casar", "ship":"Shippar casal",
-
+"meme":"Mandar meme", "piada":"Contar piada", "abraco":"Dar abraço", "beijo":"Dar beijo", "tapa":"Dar tapa",
+"dancar":"Dançar", "chorar":"Chorar", "rir":"Rir", "casar":"Casar", "ship":"Shippar casal",
+"gay":"Medidor gay", "gostoso":"Medidor gostoso", "lindo":"Medidor lindo", "sorte":"Ver sorte", "8ball":"Bola 8",
 # ECONOMIA 15
-"saldo":"Ver saldo", "carteira":"Ver carteira", "banco":"Acessar banco", "depositar":"Depositar", "sacar":"Sacar",
-"transferir":"Transferir dinheiro", "trabalhar":"Trabalhar", "roubar":"Roubar", "loja":"Abrir loja", "comprar":"Comprar item",
-"vender":"Vender item", "inventario":"Ver inventário", "usar":"Usar item", "diario":"Pegar diário", "rank":"Ver rank",
-
+"saldo":"Ver saldo", "banco":"Acessar banco", "depositar":"Depositar", "sacar":"Sacar", "transferir":"Transferir dinheiro",
+"trabalhar":"Trabalhar", "roubar":"Roubar", "loja":"Abrir loja", "comprar":"Comprar item", "vender":"Vender item",
+"inventario":"Ver inventário", "diario":"Pegar diário", "rank":"Ver rank", "top":"Top ricos", "casino":"Ir ao cassino",
 # STAFF 15
 "tickets":"Ver tickets", "claim":"Assumir ticket", "close":"Fechar ticket", "transcript":"Gerar transcript", "whitelistadd":"Add whitelist",
-"whitelistrem":"Rem whitelist", "whitelistlist":"Listar whitelist", "logs":"Ver logs", "relatorios":"Ver relatórios", "backup":"Fazer backup",
-"sugestao":"Enviar sugestão", "reportar":"Reportar bug", "bug":"Reportar erro", "ajuda":"Menu de ajuda", "sorteio":"Iniciar sorteio",
-
-# SISTEMA 5
-"sistema":"Painel sistema", "restart":"Reiniciar bot", "config":"Configurar bot", "stats":"Estatísticas", "creditos":"Créditos"
+"whitelistrem":"Rem whitelist", "logs":"Ver logs", "relatorios":"Ver relatórios", "backup":"Fazer backup", "config":"Configurar bot",
+"restart":"Reiniciar bot", "stats":"Estatísticas", "creditos":"Créditos", "sistema":"Painel sistema", "seguranca":"Anti-raid"
 }
 
 for nome, desc in COMANDOS.items():
@@ -137,18 +123,9 @@ async def whitelist(i: discord.Interaction):
     await i.channel.send(embed=discord.Embed(title="📝 WHITELIST", color=0x57F287), view=WhitelistPainel())
     await i.response.send_message("✅ Enviado", ephemeral=True)
 
-@bot.tree.command(name="seguranca", description="Anti-raid")
-async def seguranca(i: discord.Interaction, ativo: bool):
-    db["config"]["antiraid"] = ativo; save(); await i.response.send_message(f"✅ Anti-raid: {ativo}", ephemeral=True)
-
-@bot.event
-async def on_member_join(member):
-    if member.bot and db["config"].get("antiraid") and not member.public_flags.verified_bot:
-        await member.kick(reason="Bot não verificado")
-
 @bot.event
 async def on_ready():
     await bot.tree.sync()
-    print(f'✅ V61 ONLINE - 99 COMANDOS CARREGADOS')
+    print(f'✅ V62 ONLINE - 94 COMANDOS CARREGADOS')
 
 bot.run(os.getenv("TOKEN"))
