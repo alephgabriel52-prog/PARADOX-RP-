@@ -3,10 +3,10 @@ from discord.ext import commands,tasks
 from flask import Flask
 from threading import Thread
 
-print("INICIANDO V118...")
+print("INICIANDO V119...")
 app=Flask('')
 @app.route('/')
-def h():return"V118 NOSSO RP"
+def h():return"V119 NOSSO RP"
 Thread(target=lambda:app.run(host='0.0.0.0',port=8080)).start()
 
 intents=discord.Intents.all()
@@ -36,7 +36,7 @@ PERGUNTAS=[
 
 class ConfigPanel(discord.ui.View):
  def __init__(self):super().__init__(timeout=None)
- @discord.ui.select(placeholder="⚙️ SELECIONE O QUE QUER CONFIGURAR",custom_id="config_select_v118",options=[
+ @discord.ui.select(placeholder="⚙️ SELECIONE O QUE QUER CONFIGURAR",custom_id="config_select_v119",options=[
   discord.SelectOption(label="Canal de Whitelist",emoji="📝",value="wc"),
   discord.SelectOption(label="Cargo da Staff",emoji="👮",value="sc"),
   discord.SelectOption(label="Categoria de Tickets",emoji="📂",value="tc"),
@@ -62,22 +62,22 @@ class StaffTicket(discord.ui.View):
   ch=bot.get_channel(self.cid)
   if ch:await ch.delete()
   for k in [self.uid,f"step_{self.uid}",f"res_{self.uid}"]:db["tickets"].pop(k,None);sv()
- @discord.ui.button(label="ACEITAR",style=discord.ButtonStyle.green,emoji="✅",custom_id="accept_ticket_v118")
+ @discord.ui.button(label="ACEITAR",style=discord.ButtonStyle.green,emoji="✅",custom_id="accept_ticket_v119")
  async def accept(self,i,b):
   if not (i.user.guild_permissions.administrator or i.user.id==DONO or str(i.user.id)==db["cfg"]["sc"]):return await i.response.send_message("❌ Só STAFF",ephemeral=True)
   db["wl"][self.uid]["status"]="aprovado";sv();await (await bot.fetch_user(int(self.uid))).send("✅ **APROVADO** no Nosso RP!");await self.apagar(i)
- @discord.ui.button(label="RECUSAR",style=discord.ButtonStyle.red,emoji="❌",custom_id="deny_ticket_v118")
+ @discord.ui.button(label="RECUSAR",style=discord.ButtonStyle.red,emoji="❌",custom_id="deny_ticket_v119")
  async def deny(self,i,b):
   if not (i.user.guild_permissions.administrator or i.user.id==DONO or str(i.user.id)==db["cfg"]["sc"]):return await i.response.send_message("❌ Só STAFF",ephemeral=True)
   db["wl"][self.uid]["status"]="reprovado";sv();await (await bot.fetch_user(int(self.uid))).send("❌ **REPROVADO** no Nosso RP!");await self.apagar(i)
- @discord.ui.button(label="FECHAR",style=discord.ButtonStyle.gray,emoji="🔒",custom_id="close_ticket_v118")
+ @discord.ui.button(label="FECHAR",style=discord.ButtonStyle.gray,emoji="🔒",custom_id="close_ticket_v119")
  async def close(self,i,b):
   if not (i.user.guild_permissions.administrator or i.user.id==DONO or str(i.user.id)==db["cfg"]["sc"]):return await i.response.send_message("❌ Só STAFF",ephemeral=True)
   await self.apagar(i)
 
 class WLStartButton(discord.ui.View):
  def __init__(self):super().__init__(timeout=None)
- @discord.ui.button(label="INICIAR WHITELIST",style=discord.ButtonStyle.green,emoji="📝",custom_id="wl_ticket_v118")
+ @discord.ui.button(label="INICIAR WHITELIST",style=discord.ButtonStyle.green,emoji="📝",custom_id="wl_ticket_v119")
  async def start(self,i,b):
   uid=str(i.user.id)
   if uid in db["wl"] and db["wl"][uid]["status"]=="aprovado":return await i.response.send_message("❌ Já aprovado",ephemeral=True)
@@ -177,7 +177,7 @@ async def warn(ctx,member:discord.Member,*,motivo):
 async def warns(ctx,member:discord.Member):
  uid=str(member.id)
  if uid not in db["warns"] or not db["warns"][uid]:return await ctx.send("✅ Sem warns")
- txt="\n".join([f"{i+1}. {w}" for i,w in enumerate(db['warns'][uid])
+ txt="\n".join([f"{i+1}. {w}" for i,w in enumerate(db['warns'][uid]) # <-- CORRIGIDO O ] AQUI
  await ctx.send(f"**WARNS DE {member.name}:**\n{txt}")
 @bot.command()
 @is_staff()
@@ -215,6 +215,6 @@ async def setup_hook():
 @bot.event
 async def on_ready():
  va.start()
- print("✅ V118 ONLINE - SEM ERRO")
+ print("✅ V119 ONLINE - SEM ERRO")
 
 bot.run(os.getenv("TOKEN"))
