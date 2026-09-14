@@ -6,7 +6,7 @@ from threading import Thread
 
 app = Flask('')
 @app.route('/')
-def home(): return "Bot Online V95"
+def home(): return "Bot Online V96"
 Thread(target=lambda: app.run(host='0.0.0.0', port=8080)).start()
 
 intents = discord.Intents.all()
@@ -19,7 +19,7 @@ except: db = {"config":{}, "tickets":{}, "whitelist":{}, "warns":{}, "anuncios":
 def save(): json.dump(db, open(ARQUIVO,'w',encoding='utf-8'), ensure_ascii=False, indent=4)
 
 OWNER_ID = 1438010935783460954
-BANNER_FAIXA = "https://cdn.discordapp.com/attachments/1527669780364918925/1549093554960474243/file_0005a0820e8df98c1974ab6ecc.png" # SUA FAIXA NOVA
+BANNER_FAIXA = "https://cdn.discordapp.com/attachments/1527669780364918925/1549093554960474243/file_0005a0820e8df98c1974ab6ecc.png"
 
 def is_staff():
     async def predicate(ctx):
@@ -41,14 +41,68 @@ async def verificar_anuncios():
             if canal:
                 embed = discord.Embed(title="📢 ANÚNCIO", description=anuncio["mensagem"], color=0xFF0000)
                 embed.set_image(url=BANNER_FAIXA)
-                embed.set_footer(text=f"Agendado por {anuncio['autor']}")
+                embed.set_footer(text=f"Agendado por {anuncio['autor']} • ID: {anuncio['id']}")
                 await canal.send("@everyone", embed=embed)
             db["anuncios"].remove(anuncio); save()
 
 @verificar_anuncios.before_loop
 async def before(): await bot.wait_until_ready()
 
-# ============ TICKET ============
+# ============ COMANDOS ANUNCIO ============
+@bot.command(name="anuncio")
+@is_admin()
+async def anuncio(ctx):
+    await ctx.send("📢 **Sistema de Anúncio**\n1. Manda o ID do CANAL")
+    def check(m): return m.author == ctx.author and m.channel == ctx.channel
+    try:
+        canal_msg = await bot.wait_for('message', timeout=60.0, check=check)
+        canal_id = int(canal_msg.content)
+        await ctx.send("2. Manda a MENSAGEM do anúncio")
+        msg = await bot.wait_for('message', timeout=120.0, check=check)
+        await ctx.send("3. Manda o HORÁRIO no formato HH:MM ex: 12:30")
+        hora = await bot.wait_for('message', timeout=60.0, check=check)
+
+        novo_id = len(db["anuncios"]) + 1
+        db["anuncios"].append({"id": novo_id, "canal": canal_id, "mensagem": msg.content, "hora": hora.content, "autor": ctx.author.name})
+        save()
+        await ctx.send(f"✅ Anúncio **ID: {novo_id}** agendado para `{hora.content}` no canal <#{canal_id}>")
+    except: await ctx.send("❌ Tempo acabou ou ID inválido")
+
+@bot.command(name="anuncios")
+@is_admin()
+async def anuncios(ctx):
+    if not db["anuncios"]: return await ctx.send("📭 Não tem nenhum anúncio agendado.")
+
+    embed = discord.Embed(title="📢 Anúncios Agendados", color=0xFF0000)
+    for a in db["anuncios"]:
+        embed.add_field(
+            name=f"ID: {a['id']} | ⏰ {a['hora']}",
+            value=f"Canal: <#{a['canal']}>\nAutor: {a['autor']}\nMsg: {a['mensagem'][:50]}...",
+            inline=False
+        )
+    embed.set_footer(text="Use!cancelaranuncio ID ou!adiaranuncio ID HH:MM")
+    await ctx.send(embed=embed)
+
+@bot.command(name="cancelaranuncio")
+@is_admin()
+async def cancelaranuncio(ctx, id: int):
+    for a in db["anuncios"]:
+        if a["id"] == id:
+            db["anuncios"].remove(a); save()
+            return await ctx.send(f"✅ Anúncio **ID: {id}** cancelado.")
+    await ctx.send("❌ ID não encontrado.")
+
+@bot.command(name="adiaranuncio")
+@is_admin()
+async def adiaranuncio(ctx, id: int, nova_hora: str):
+    for a in db["anuncios"]:
+        if a["id"] == id:
+            hora_antiga = a["hora"]
+            a["hora"] = nova_hora; save()
+            return await ctx.send(f"✅ Anúncio **ID: {id}** adiado de `{hora_antiga}` para `{nova_hora}`")
+    await ctx.send("❌ ID não encontrado.")
+
+# ============ TICKET E WHITELIST ============
 class TicketSelect(discord.ui.Select):
     def __init__(self):
         options = [
@@ -63,7 +117,7 @@ class TicketSelect(discord.ui.Select):
         if db["tickets"].get(user_id, {}).get(tipo):
             canal_id = db["tickets"][user_id][tipo]
             canal = i.guild.get_channel(canal_id)
-            if canal: return await i.response.send_message(f"❌ Você já tem um ticket aberto de **{tipo}**: {canal.mention}", ephemeral=True)
+            if canal: return await i.response.send_message(f"❌ Você já tem um ticket aberto: {canal.mention}", ephemeral=True)
             else: db["tickets"][user_id].pop(tipo); save()
         await i.response.send_modal(TicketMotivo(tipo))
 
@@ -114,7 +168,6 @@ class TicketMotivo(discord.ui.Modal):
         await canal.send(content=f"{i.user.mention} <@&{db['config']['staff_cargo']}>", embed=embed, view=TicketAcoes(i.user.id, self.tipo))
         await i.response.send_message(f"✅ Ticket: {canal.mention}", ephemeral=True)
 
-# ============ WHITELIST ============
 class WhitelistPainel(discord.ui.View):
     @discord.ui.button(label="📝 Fazer Whitelist", style=discord.ButtonStyle.success)
     async def fazer(self, i, b):
@@ -162,7 +215,6 @@ class WhitelistEtapa4(discord.ui.Modal, title="Whitelist 4/4"):
             await canal.send(f"<@&{db['config']['staff_cargo']}>", embed=embed, view=WhitelistAcoesStaff(uid))
         await i.response.send_message("✅ Enviada!", ephemeral=True)
 
-# ============ COMANDOS ============
 @bot.command(name="ticket")
 async def ticket(ctx):
     embed = discord.Embed(title="🎫 Painel de Atendimento", description="Escolha o motivo abaixo.", color=0xFF0000)
@@ -174,89 +226,6 @@ async def whitelist(ctx):
     embed = discord.Embed(title="📝 WHITELIST PARADOXO RP", description="Clique para iniciar.\n✅ APROVADO = não faz mais\n🔄 REPROVADO = pode tentar", color=0xFF0000)
     embed.set_image(url=BANNER_FAIXA)
     await ctx.send(embed=embed, view=WhitelistPainel())
-
-# ============ COMANDOS STAFF ============
-@bot.command(name="kick")
-@is_staff()
-async def kick(ctx, membro: discord.Member, *, motivo="Sem motivo"):
-    await membro.kick(reason=motivo); await ctx.send(f"👢 {membro.mention} expulso. Motivo: {motivo}")
-
-@bot.command(name="ban")
-@is_staff()
-async def ban(ctx, membro: discord.Member, *, motivo="Sem motivo"):
-    await membro.ban(reason=motivo); await ctx.send(f"🔨 {membro.mention} banido. Motivo: {motivo}")
-
-@bot.command(name="unban")
-@is_staff()
-async def unban(ctx, id: int):
-    await ctx.guild.unban(await bot.fetch_user(id)); await ctx.send(f"✅ Desbanido.")
-
-@bot.command(name="clear")
-@is_staff()
-async def clear(ctx, q: int):
-    await ctx.channel.purge(limit=q+1); msg = await ctx.send(f"🧹 {q} mensagens apagadas."); await asyncio.sleep(3); await msg.delete()
-
-@bot.command(name="warn")
-@is_staff()
-async def warn(ctx, membro: discord.Member, *, motivo):
-    if str(membro.id) not in db["warns"]: db["warns"][str(membro.id)] = []
-    db["warns"][str(membro.id)].append({"motivo": motivo, "data": str(datetime.datetime.now()), "staff": ctx.author.id}); save()
-    await ctx.send(f"⚠️ {membro.mention} recebeu warn. Motivo: {motivo}")
-
-@bot.command(name="warns")
-@is_staff()
-async def warns(ctx, membro: discord.Member):
-    warns = db["warns"].get(str(membro.id), [])
-    if not warns: return await ctx.send(f"{membro.mention} não tem warns.")
-    embed = discord.Embed(title=f"Warns de {membro.name}", color=0xFF0000)
-    for i, w in enumerate(warns, 1): embed.add_field(name=f"Warn #{i}", value=f"Motivo: {w['motivo']}\nData: {w['data']}", inline=False)
-    await ctx.send(embed=embed)
-
-# ============ COMANDOS ADM ============
-@bot.command(name="mute")
-@is_admin()
-async def mute(ctx, membro: discord.Member, tempo: int = 0, *, motivo="Sem motivo"):
-    role = discord.utils.get(ctx.guild.roles, name="Muted")
-    if not role: role = await ctx.guild.create_role(name="Muted")
-    await membro.add_roles(role)
-    await ctx.send(f"🔇 {membro.mention} mutado. Motivo: {motivo}")
-    if tempo > 0: await asyncio.sleep(tempo*60); await membro.remove_roles(role); await ctx.send(f"🔊 {membro.mention} desmutado.")
-
-@bot.command(name="unmute")
-@is_admin()
-async def unmute(ctx, membro: discord.Member):
-    role = discord.utils.get(ctx.guild.roles, name="Muted")
-    if role: await membro.remove_roles(role)
-    await ctx.send(f"🔊 {membro.mention} desmutado.")
-
-@bot.command(name="addcargo")
-@is_admin()
-async def addcargo(ctx, membro: discord.Member, cargo: discord.Role):
-    await membro.add_roles(cargo); await ctx.send(f"✅ Cargo {cargo.name} adicionado a {membro.mention}")
-
-@bot.command(name="removecargo")
-@is_admin()
-async def removecargo(ctx, membro: discord.Member, cargo: discord.Role):
-    await membro.remove_roles(cargo); await ctx.send(f"✅ Cargo {cargo.name} removido de {membro.mention}")
-
-# ============ COMANDO ANÚNCIO ============
-@bot.command(name="anuncio")
-@is_admin()
-async def anuncio(ctx):
-    await ctx.send("📢 **Sistema de Anúncio**\n1. Manda o ID do CANAL")
-    def check(m): return m.author == ctx.author and m.channel == ctx.channel
-    try:
-        canal_msg = await bot.wait_for('message', timeout=60.0, check=check)
-        canal_id = int(canal_msg.content)
-        await ctx.send("2. Manda a MENSAGEM do anúncio")
-        msg = await bot.wait_for('message', timeout=120.0, check=check)
-        await ctx.send("3. Manda o HORÁRIO no formato HH:MM ex: 12:30")
-        hora = await bot.wait_for('message', timeout=60.0, check=check)
-        
-        db["anuncios"].append({"canal": canal_id, "mensagem": msg.content, "hora": hora.content, "autor": ctx.author.name})
-        save()
-        await ctx.send(f"✅ Anúncio agendado para {hora.content} no canal <#{canal_id}>")
-    except: await ctx.send("❌ Tempo acabou ou ID inválido")
 
 @bot.command(name="botconfig")
 @commands.check(lambda ctx: ctx.author.id == OWNER_ID)
@@ -274,6 +243,6 @@ async def botconfig(ctx):
 @bot.event
 async def on_ready():
     verificar_anuncios.start()
-    print(f'✅ V95 ONLINE')
+    print(f'✅ V96 ONLINE')
 
 bot.run(os.getenv("TOKEN"))
