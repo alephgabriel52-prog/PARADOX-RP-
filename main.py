@@ -1,12 +1,12 @@
 import discord
-from discord.ext import commands
-import os, json, asyncio, io
+from discord.ext import commands, tasks
+import os, json, asyncio, io, datetime
 from flask import Flask
 from threading import Thread
 
 app = Flask('')
 @app.route('/')
-def home(): return "Bot Online V91"
+def home(): return "Bot Online V95"
 Thread(target=lambda: app.run(host='0.0.0.0', port=8080)).start()
 
 intents = discord.Intents.all()
@@ -15,13 +15,40 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 ARQUIVO = 'botdata.json'
 try: db = json.load(open(ARQUIVO,'r',encoding='utf-8'))
-except: db = {"config":{}, "tickets":{}, "whitelist":{}, "warns":{}}
+except: db = {"config":{}, "tickets":{}, "whitelist":{}, "warns":{}, "anuncios":[]}
 def save(): json.dump(db, open(ARQUIVO,'w',encoding='utf-8'), ensure_ascii=False, indent=4)
 
 OWNER_ID = 1438010935783460954
-BANNER_VERMELHO = "https://cdn.discordapp.com/attachments/1481856611587723295/1549067503588606033/file_00000136881f58a07836a66e4246c.png"
-BANNER_BOT = "https://cdn.discordapp.com/attachments/1481856611587723295/1549067503890866176/IMG_20260914_111956.jpg"
+BANNER_FAIXA = "https://cdn.discordapp.com/attachments/1527669780364918925/1549093554960474243/file_0005a0820e8df98c1974ab6ecc.png" # SUA FAIXA NOVA
 
+def is_staff():
+    async def predicate(ctx):
+        return any(r.id == db["config"].get("staff_cargo") for r in ctx.author.roles) or ctx.author.id == OWNER_ID
+    return commands.check(predicate)
+
+def is_admin():
+    async def predicate(ctx):
+        return ctx.author.guild_permissions.administrator or ctx.author.id == OWNER_ID
+    return commands.check(predicate)
+
+# ============ SISTEMA DE ANÚNCIO AGENDADO ============
+@tasks.loop(minutes=1)
+async def verificar_anuncios():
+    agora = datetime.datetime.now().strftime("%H:%M")
+    for anuncio in db["anuncios"][:]:
+        if anuncio["hora"] == agora:
+            canal = bot.get_channel(anuncio["canal"])
+            if canal:
+                embed = discord.Embed(title="📢 ANÚNCIO", description=anuncio["mensagem"], color=0xFF0000)
+                embed.set_image(url=BANNER_FAIXA)
+                embed.set_footer(text=f"Agendado por {anuncio['autor']}")
+                await canal.send("@everyone", embed=embed)
+            db["anuncios"].remove(anuncio); save()
+
+@verificar_anuncios.before_loop
+async def before(): await bot.wait_until_ready()
+
+# ============ TICKET ============
 class TicketSelect(discord.ui.Select):
     def __init__(self):
         options = [
@@ -52,50 +79,47 @@ class TicketAcoes(discord.ui.View):
         await i.channel.set_permissions(i.guild.default_role, send_messages=False)
         await i.channel.set_permissions(i.user, send_messages=True)
         await i.channel.set_permissions(await bot.fetch_user(self.user_id), send_messages=True)
-        await i.response.send_message(f"✅ Assumido por {i.user.mention}")
+        await i.response.send_message(f"✅ Ticket assumido por {i.user.mention} <@&{db['config']['staff_cargo']}>")
     @discord.ui.button(label="🔒 Fechar", style=discord.ButtonStyle.red)
-    async def fechar(self, i, b): await i.response.send_modal(FecharMotivo(self.user_id, i.channel.id, self.tipo))
+    async def fechar(self, i, b):
+        if not any(r.id == db["config"].get("staff_cargo") for r in i.user.roles): return await i.response.send_message("❌ **SÓ STAFF PODE FECHAR**", ephemeral=True)
+        await i.response.send_modal(FecharMotivo(self.user_id, i.channel.id, self.tipo))
 
 class FecharMotivo(discord.ui.Modal, title="Fechar Ticket"):
-    motivo = discord.ui.TextInput(label="Motivo")
+    motivo = discord.ui.TextInput(label="Motivo", style=discord.TextStyle.paragraph)
     def __init__(self, user_id, cid, tipo): super().__init__(); self.user_id=user_id; self.cid=cid; self.tipo=tipo
     async def on_submit(self, i):
         user = await bot.fetch_user(self.user_id); await user.send(f"🔒 Ticket de **{self.tipo}** fechado.\nMotivo: {self.motivo.value}")
-        db["tickets"][str(self.user_id)].pop(self.tipo, None); db["tickets"].pop(str(self.cid), None); save()
         msgs = [f"[{m.created_at.strftime('%d/%m %H:%M')}] {m.author.name}: {m.content}" async for m in i.channel.history(limit=500)]
-        file = discord.File(io.BytesIO("\n".join(reversed(msgs)).encode()), filename=f"ticket-{self.cid}.txt")
-        if db["config"].get("transcript_canal"): await bot.get_channel(db["config"]["transcript_canal"]).send(f"📁 Repositório", file=file)
-        await i.response.send_message("Fechando..."); await asyncio.sleep(3); await i.channel.delete()
+        file = discord.File(io.BytesIO("\n".join(reversed(msgs)).encode('utf-8')), filename=f"transcript-{self.cid}.txt")
+        embed = discord.Embed(title=f"📁 Transcript - {self.tipo}", color=0xFF0000)
+        embed.set_image(url=BANNER_FAIXA)
+        if db["config"].get("transcript_canal"): await bot.get_channel(db["config"]["transcript_canal"]).send(embed=embed, file=file)
+        db["tickets"][str(self.user_id)].pop(self.tipo, None); db["tickets"].pop(str(self.cid), None); save()
+        await i.response.send_message("🔒 Fechando..."); await asyncio.sleep(3); await i.channel.delete()
 
 class TicketMotivo(discord.ui.Modal):
     def __init__(self, tipo): super().__init__(title=f"Ticket: {tipo}"); self.tipo=tipo
     motivo = discord.ui.TextInput(label="Descreva", style=discord.TextStyle.paragraph)
     async def on_submit(self, i):
-        if not db["config"].get("ticket_categoria"): return await i.response.send_message("❌ Configure com `!botconfig`", ephemeral=True)
-        
         cat = bot.get_channel(db["config"]["ticket_categoria"])
-        if not cat or cat.type!= discord.ChannelType.category:
-            return await i.response.send_message("❌ ERRO: O ID salvo não é de uma CATEGORIA! Use `!botconfig` e cole o ID da pasta.", ephemeral=True)
-        
-        try:
-            canal = await i.guild.create_text_channel(f"ticket-{self.tipo}-{i.user.name}", category=cat)
-        except discord.HTTPException:
-            return await i.response.send_message("❌ Não consegui criar o canal. Verifique se o ID da categoria está correto.", ephemeral=True)
-            
+        canal = await i.guild.create_text_channel(f"ticket-{self.tipo}-{i.user.name}", category=cat)
         await canal.set_permissions(i.guild.default_role, read_messages=False)
         await canal.set_permissions(i.user, read_messages=True, send_messages=True)
         if str(i.user.id) not in db["tickets"]: db["tickets"][str(i.user.id)] = {}
         db["tickets"][str(i.user.id)][self.tipo] = canal.id
         db["tickets"][str(canal.id)] = {"user": i.user.id, "staff": None, "tipo": self.tipo}; save()
-        await canal.send(f"{i.user.mention}\n**Tipo:** {self.tipo}\n**Motivo:** {self.motivo.value}", view=TicketAcoes(i.user.id, self.tipo))
+        embed = discord.Embed(title=f"🎫 Ticket de {self.tipo}", description=f"{i.user.mention}\n**Tipo:** {self.tipo}\n**Motivo:** {self.motivo.value}\n\n<@&{db['config']['staff_cargo']}>", color=0xFF0000)
+        embed.set_image(url=BANNER_FAIXA)
+        await canal.send(content=f"{i.user.mention} <@&{db['config']['staff_cargo']}>", embed=embed, view=TicketAcoes(i.user.id, self.tipo))
         await i.response.send_message(f"✅ Ticket: {canal.mention}", ephemeral=True)
 
+# ============ WHITELIST ============
 class WhitelistPainel(discord.ui.View):
     @discord.ui.button(label="📝 Fazer Whitelist", style=discord.ButtonStyle.success)
     async def fazer(self, i, b):
-        user_data = db["whitelist"].get(str(i.user.id), {})
-        if user_data.get("status") == "aprovado": return await i.response.send_message("❌ Você já foi aprovado na whitelist.", ephemeral=True)
-        if user_data.get("status") == "em_analise": return await i.response.send_message("⏳ Sua whitelist já está em análise.", ephemeral=True)
+        if db["whitelist"].get(str(i.user.id), {}).get("status") == "aprovado": return await i.response.send_message("❌ Já aprovado.", ephemeral=True)
+        if db["whitelist"].get(str(i.user.id), {}).get("status") == "em_analise": return await i.response.send_message("⏳ Em análise.", ephemeral=True)
         await i.response.send_modal(WhitelistEtapa1())
 
 class WhitelistAcoesStaff(discord.ui.View):
@@ -104,84 +128,152 @@ class WhitelistAcoesStaff(discord.ui.View):
     async def aprovar(self, i, b):
         if not any(r.id == db["config"].get("staff_cargo") for r in i.user.roles): return await i.response.send_message("❌ Só STAFF", ephemeral=True)
         db["whitelist"][str(self.user_id)]["status"] = "aprovado"; save()
-        user = await bot.fetch_user(self.user_id)
-        await user.send("🎉 **APROVADO!** Sua whitelist foi aceita.")
-        await i.response.edit_message(content=f"✅ Whitelist de {user.mention} **APROVADA**", view=None)
+        await (await bot.fetch_user(self.user_id)).send("🎉 **APROVADO!**")
+        await i.response.edit_message(content=f"✅ Aprovada por {i.user.mention}", view=None)
     @discord.ui.button(label="❌ Reprovar", style=discord.ButtonStyle.red)
     async def reprovar(self, i, b):
         if not any(r.id == db["config"].get("staff_cargo") for r in i.user.roles): return await i.response.send_message("❌ Só STAFF", ephemeral=True)
         db["whitelist"][str(self.user_id)]["status"] = "reprovado"; save()
-        user = await bot.fetch_user(self.user_id)
-        await user.send("❌ **REPROVADO!** Você pode fazer a whitelist novamente.")
-        await i.response.edit_message(content=f"❌ Whitelist de {user.mention} **REPROVADA**", view=None)
+        await (await bot.fetch_user(self.user_id)).send("❌ **REPROVADO!**")
+        await i.response.edit_message(content=f"❌ Reprovada por {i.user.mention}", view=None)
 
 class WhitelistEtapa1(discord.ui.Modal, title="Whitelist 1/4"):
-    r1=discord.ui.TextInput(label="1. O que é RDM?"); r2=discord.ui.TextInput(label="2. O que é VDM?"); r3=discord.ui.TextInput(label="3. Meta Gaming?"); r4=discord.ui.TextInput(label="4. Power Gaming?"); r5=discord.ui.TextInput(label="5. Combat Log?")
+    r1=discord.ui.TextInput(label="1. RDM?", required=True); r2=discord.ui.TextInput(label="2. VDM?", required=True); r3=discord.ui.TextInput(label="3. Meta Gaming?", required=True); r4=discord.ui.TextInput(label="4. Power Gaming?", required=True); r5=discord.ui.TextInput(label="5. Combat Log?", required=True)
     async def on_submit(self, i): db["whitelist"][str(i.user.id)]={"e1":[self.r1.value,self.r2.value,self.r3.value,self.r4.value,self.r5.value]}; save(); await i.response.send_modal(WhitelistEtapa2(i.user.id))
 class WhitelistEtapa2(discord.ui.Modal, title="Whitelist 2/4"):
     def __init__(self, uid): super().__init__(); self.uid=uid
-    r1=discord.ui.TextInput(label="6. Sequestro?"); r2=discord.ui.TextInput(label="7. Atirar de carro?"); r3=discord.ui.TextInput(label="8. Fear RP?"); r4=discord.ui.TextInput(label="9. Assalto?"); r5=discord.ui.TextInput(label="10. Favorecimento?")
+    r1=discord.ui.TextInput(label="6. Sequestro?", required=True); r2=discord.ui.TextInput(label="7. Atirar de carro?", required=True); r3=discord.ui.TextInput(label="8. Fear RP?", required=True); r4=discord.ui.TextInput(label="9. Assalto?", required=True); r5=discord.ui.TextInput(label="10. Favorecimento?", required=True)
     async def on_submit(self, i): db["whitelist"][str(self.uid)]["e2"]=[self.r1.value,self.r2.value,self.r3.value,self.r4.value,self.r5.value]; save(); await i.response.send_modal(WhitelistEtapa3(self.uid))
 class WhitelistEtapa3(discord.ui.Modal, title="Whitelist 3/4"):
     def __init__(self, uid): super().__init__(); self.uid=uid
-    r1=discord.ui.TextInput(label="11. Roubar polícia?"); r2=discord.ui.TextInput(label="12. Anti RP?"); r3=discord.ui.TextInput(label="13. Idade facção?"); r4=discord.ui.TextInput(label="14. Tomar DM?"); r5=discord.ui.TextInput(label="15. Gatilho?")
+    r1=discord.ui.TextInput(label="11. Roubar polícia?", required=True); r2=discord.ui.TextInput(label="12. Anti RP?", required=True); r3=discord.ui.TextInput(label="13. Idade facção?", required=True); r4=discord.ui.TextInput(label="14. Tomar DM?", required=True); r5=discord.ui.TextInput(label="15. Gatilho?", required=True)
     async def on_submit(self, i): db["whitelist"][str(self.uid)]["e3"]=[self.r1.value,self.r2.value,self.r3.value,self.r4.value,self.r5.value]; save(); await i.response.send_modal(WhitelistEtapa4(self.uid))
 class WhitelistEtapa4(discord.ui.Modal, title="Whitelist 4/4"):
     def __init__(self, uid): super().__init__(); self.uid=uid
-    r1=discord.ui.TextInput(label="16. Info Discord?"); r2=discord.ui.TextInput(label="17. Coerência?"); r3=discord.ui.TextInput(label="18. Abordagem?"); r4=discord.ui.TextInput(label="19. Por que entrar? 10 linhas", style=discord.TextStyle.paragraph); r5=discord.ui.TextInput(label="20. RP completo", style=discord.TextStyle.paragraph)
+    r1=discord.ui.TextInput(label="16. Info Discord?", required=True); r2=discord.ui.TextInput(label="17. Coerência?", required=True); r3=discord.ui.TextInput(label="18. Abordagem?", required=True); r4=discord.ui.TextInput(label="19. Por que entrar? 10 linhas", style=discord.TextStyle.paragraph, required=True); r5=discord.ui.TextInput(label="20. RP completo", style=discord.TextStyle.paragraph, required=True)
     async def on_submit(self, i):
         uid = str(self.uid)
         db["whitelist"][uid]["e4"]=[self.r1.value,self.r2.value,self.r3.value,self.r4.value,self.r5.value]
         db["whitelist"][uid]["status"] = "em_analise"; save()
         if db["config"].get("whitelist_canal"):
             canal = bot.get_channel(db["config"]["whitelist_canal"])
-            embed = discord.Embed(title=f"📝 Nova Whitelist - {i.user.name}", color=0xFEE75C)
-            await canal.send(f"{i.user.mention}", embed=embed, view=WhitelistAcoesStaff(uid))
-        await i.response.send_message("✅ Whitelist enviada!", ephemeral=True)
+            embed = discord.Embed(title=f"📝 Nova Whitelist - {i.user.name}", color=0xFF0000)
+            embed.set_image(url=BANNER_FAIXA)
+            await canal.send(f"<@&{db['config']['staff_cargo']}>", embed=embed, view=WhitelistAcoesStaff(uid))
+        await i.response.send_message("✅ Enviada!", ephemeral=True)
 
+# ============ COMANDOS ============
 @bot.command(name="ticket")
 async def ticket(ctx):
-    embed = discord.Embed(
-        title="🎫 Painel de Atendimento",
-        description=(
-            "Bem-vindo ao painel de suporte.\n\n"
-            "💬 **Suporte:** dúvidas, erros ou pedidos de ajuda.\n"
-            "🤝 **Parcerias:** propostas e colaborações.\n"
-            "🚨 **Denúncias:** usuários ou comportamentos indevidos.\n"
-            "💰 **Pagamentos:** dúvidas ou problemas com compras.\n"
-            "❓ **Outros:** qualquer assunto não listado.\n\n"
-            "🕐 **Depois de abrir seu ticket, aguarde.**\n"
-            "⚠️ **1 ticket por categoria.**"
-        ),
-        color=0xFF0000
-    )
-    embed.set_image(url=BANNER_VERMELHO)
-    embed.set_footer(text="PARADOXO ROLEPLAY")
+    embed = discord.Embed(title="🎫 Painel de Atendimento", description="Escolha o motivo abaixo.", color=0xFF0000)
+    embed.set_image(url=BANNER_FAIXA)
     await ctx.send(embed=embed, view=TicketPainel())
 
 @bot.command(name="whitelist")
 async def whitelist(ctx):
-    embed = discord.Embed(
-        title="📝 WHITELIST PARADOXO RP",
-        description="Clique abaixo para iniciar.\n\n**Regras:**\n✅ **APROVADO** = não faz mais\n🔄 **REPROVADO** = pode tentar de novo",
-        color=0x57F287
-    )
-    embed.set_image(url=BANNER_BOT)
+    embed = discord.Embed(title="📝 WHITELIST PARADOXO RP", description="Clique para iniciar.\n✅ APROVADO = não faz mais\n🔄 REPROVADO = pode tentar", color=0xFF0000)
+    embed.set_image(url=BANNER_FAIXA)
     await ctx.send(embed=embed, view=WhitelistPainel())
+
+# ============ COMANDOS STAFF ============
+@bot.command(name="kick")
+@is_staff()
+async def kick(ctx, membro: discord.Member, *, motivo="Sem motivo"):
+    await membro.kick(reason=motivo); await ctx.send(f"👢 {membro.mention} expulso. Motivo: {motivo}")
+
+@bot.command(name="ban")
+@is_staff()
+async def ban(ctx, membro: discord.Member, *, motivo="Sem motivo"):
+    await membro.ban(reason=motivo); await ctx.send(f"🔨 {membro.mention} banido. Motivo: {motivo}")
+
+@bot.command(name="unban")
+@is_staff()
+async def unban(ctx, id: int):
+    await ctx.guild.unban(await bot.fetch_user(id)); await ctx.send(f"✅ Desbanido.")
+
+@bot.command(name="clear")
+@is_staff()
+async def clear(ctx, q: int):
+    await ctx.channel.purge(limit=q+1); msg = await ctx.send(f"🧹 {q} mensagens apagadas."); await asyncio.sleep(3); await msg.delete()
+
+@bot.command(name="warn")
+@is_staff()
+async def warn(ctx, membro: discord.Member, *, motivo):
+    if str(membro.id) not in db["warns"]: db["warns"][str(membro.id)] = []
+    db["warns"][str(membro.id)].append({"motivo": motivo, "data": str(datetime.datetime.now()), "staff": ctx.author.id}); save()
+    await ctx.send(f"⚠️ {membro.mention} recebeu warn. Motivo: {motivo}")
+
+@bot.command(name="warns")
+@is_staff()
+async def warns(ctx, membro: discord.Member):
+    warns = db["warns"].get(str(membro.id), [])
+    if not warns: return await ctx.send(f"{membro.mention} não tem warns.")
+    embed = discord.Embed(title=f"Warns de {membro.name}", color=0xFF0000)
+    for i, w in enumerate(warns, 1): embed.add_field(name=f"Warn #{i}", value=f"Motivo: {w['motivo']}\nData: {w['data']}", inline=False)
+    await ctx.send(embed=embed)
+
+# ============ COMANDOS ADM ============
+@bot.command(name="mute")
+@is_admin()
+async def mute(ctx, membro: discord.Member, tempo: int = 0, *, motivo="Sem motivo"):
+    role = discord.utils.get(ctx.guild.roles, name="Muted")
+    if not role: role = await ctx.guild.create_role(name="Muted")
+    await membro.add_roles(role)
+    await ctx.send(f"🔇 {membro.mention} mutado. Motivo: {motivo}")
+    if tempo > 0: await asyncio.sleep(tempo*60); await membro.remove_roles(role); await ctx.send(f"🔊 {membro.mention} desmutado.")
+
+@bot.command(name="unmute")
+@is_admin()
+async def unmute(ctx, membro: discord.Member):
+    role = discord.utils.get(ctx.guild.roles, name="Muted")
+    if role: await membro.remove_roles(role)
+    await ctx.send(f"🔊 {membro.mention} desmutado.")
+
+@bot.command(name="addcargo")
+@is_admin()
+async def addcargo(ctx, membro: discord.Member, cargo: discord.Role):
+    await membro.add_roles(cargo); await ctx.send(f"✅ Cargo {cargo.name} adicionado a {membro.mention}")
+
+@bot.command(name="removecargo")
+@is_admin()
+async def removecargo(ctx, membro: discord.Member, cargo: discord.Role):
+    await membro.remove_roles(cargo); await ctx.send(f"✅ Cargo {cargo.name} removido de {membro.mention}")
+
+# ============ COMANDO ANÚNCIO ============
+@bot.command(name="anuncio")
+@is_admin()
+async def anuncio(ctx):
+    await ctx.send("📢 **Sistema de Anúncio**\n1. Manda o ID do CANAL")
+    def check(m): return m.author == ctx.author and m.channel == ctx.channel
+    try:
+        canal_msg = await bot.wait_for('message', timeout=60.0, check=check)
+        canal_id = int(canal_msg.content)
+        await ctx.send("2. Manda a MENSAGEM do anúncio")
+        msg = await bot.wait_for('message', timeout=120.0, check=check)
+        await ctx.send("3. Manda o HORÁRIO no formato HH:MM ex: 12:30")
+        hora = await bot.wait_for('message', timeout=60.0, check=check)
+        
+        db["anuncios"].append({"canal": canal_id, "mensagem": msg.content, "hora": hora.content, "autor": ctx.author.name})
+        save()
+        await ctx.send(f"✅ Anúncio agendado para {hora.content} no canal <#{canal_id}>")
+    except: await ctx.send("❌ Tempo acabou ou ID inválido")
 
 @bot.command(name="botconfig")
 @commands.check(lambda ctx: ctx.author.id == OWNER_ID)
 async def botconfig(ctx):
-    await ctx.send("⚙️ Manda os 3 IDs:\n1. **ID DA CATEGORIA** de Ticket\n2. **ID DO CARGO** Staff\n3. **ID DO CANAL** Whitelist")
+    await ctx.send("⚙️ Manda os 4 IDs:\n1. CATEGORIA Ticket\n2. CARGO Staff\n3. CANAL Whitelist\n4. CANAL Transcript")
     def check(m): return m.author.id == OWNER_ID and m.channel == ctx.channel
     try:
         cat = await bot.wait_for('message', timeout=60.0, check=check); db["config"]["ticket_categoria"] = int(cat.content)
         staff = await bot.wait_for('message', timeout=60.0, check=check); db["config"]["staff_cargo"] = int(staff.content)
         wl = await bot.wait_for('message', timeout=60.0, check=check); db["config"]["whitelist_canal"] = int(wl.content)
-        save(); await ctx.send("✅ Configurado! Teste com `!ticket`")
-    except: await ctx.send("❌ Tempo acabou ou ID inválido")
+        trans = await bot.wait_for('message', timeout=60.0, check=check); db["config"]["transcript_canal"] = int(trans.content)
+        save(); await ctx.send("✅ Configurado!")
+    except: await ctx.send("❌ Erro")
 
 @bot.event
-async def on_ready(): print(f'✅ V91 ONLINE')
+async def on_ready():
+    verificar_anuncios.start()
+    print(f'✅ V95 ONLINE')
 
 bot.run(os.getenv("TOKEN"))
