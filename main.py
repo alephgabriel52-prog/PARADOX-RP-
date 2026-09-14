@@ -2,6 +2,7 @@ import discord,os,json,datetime
 from discord.ext import commands,tasks
 from flask import Flask
 from threading import Thread
+print("INICIANDO V97...")
 app=Flask('')
 @app.route('/')
 def h():return"V97"
@@ -36,6 +37,8 @@ async def ticket(ctx):await ctx.send(embed=discord.Embed(title="🎫 PARADOXO RP
 async def whitelist(ctx):await ctx.send(embed=discord.Embed(title="📝 WHITELIST PARADOXO RP",color=0xFF0000).set_image(url=B))
 
 @bot.event
-async def on_ready():va.start();print("✅ V97 ONLINE - PARADOXO RP")
+async def on_ready():
+ print("✅ V97 ONLINE - PARADOXO RP")
+ va.start()
 
 bot.run(os.getenv("TOKEN"))
