@@ -3,22 +3,23 @@ from discord.ext import commands,tasks
 from flask import Flask
 from threading import Thread
 
-print("INICIANDO V107...")
+print("INICIANDO V108...")
 app=Flask('')
 @app.route('/')
-def h():return"V107 PARADOXO RP"
+def h():return"V108 PARADOXO RP"
 Thread(target=lambda:app.run(host='0.0.0.0',port=8080)).start()
 
 intents=discord.Intents.all()
 intents.message_content=True
 bot=commands.Bot(command_prefix="!",intents=intents)
 
-try:db=json.load(open('db.json'))
-except:db={"cfg":{"tc":0,"sc":0,"wc":0,"tr":1438010935783460954,"banner":BANNER,"prefix":"!"},"an":[],"raid":{"on":False,"lim":5},"wl":{},"warns":{},"cmds":{}}
-def sv():json.dump(db,open('db.json','w'))
-
 BANNER="https://cdn.discordapp.com/attachments/1527669780364918925/1549093554960474243/file_0005a0820e8df98c1974ab6ecc.png"
 DONO=1438010935783460954
+
+try:db=json.load(open('db.json'))
+except:db={"cfg":{"tc":0,"sc":0,"wc":0,"tr":DONO,"banner":BANNER,"prefix":"!"},"an":[],"raid":{"on":False,"lim":5},"wl":{},"warns":{},"cmds":{}}
+def sv():
+ with open('db.json','w') as f:json.dump(db,f)
 
 def is_staff():
  async def p(ctx):return ctx.author.guild_permissions.administrator or ctx.author.id==DONO or str(ctx.author.id)==db["cfg"]["sc"]
@@ -46,7 +47,7 @@ class ConfigPanel(discord.ui.View):
   elif op=="lim":await interaction.response.send_message("🔢 Manda o novo limite. Ex: 3",ephemeral=True)
   elif op=="banner":await interaction.response.send_message("🖼️ Manda o LINK da nova banner",ephemeral=True)
   elif op=="prefix":await interaction.response.send_message("#️⃣ Manda o novo prefixo. Ex:.",ephemeral=True)
-  elif op=="addcmd":await interaction.response.send_message("➕ Manda no chat assim: `nome | resposta`\nEx: `regras | Leia #regras`\nEx: `anticanais | Sistema desativado`",ephemeral=True)
+  elif op=="addcmd":await interaction.response.send_message("➕ Manda: `nome | resposta`\nEx: `regras | Leia #regras`",ephemeral=True)
   elif op=="delcmd":await interaction.response.send_message("➖ Manda o nome do comando pra deletar",ephemeral=True)
   elif op=="listcmd":lista=", ".join(db['cmds'].keys()) if db['cmds'] else "Nenhum";await interaction.response.send_message(f"📋 Comandos: {lista}",ephemeral=True)
 
@@ -54,8 +55,7 @@ class ConfigPanel(discord.ui.View):
 async def on_message(message):
  if message.author.bot:return
  if message.content.startswith(db["cfg"]["prefix"]):
-  partes=message.content[len(db["cfg"]["prefix"]):].split("|",1)
-  cmd=partes[0].strip()
+  cmd=message.content[len(db["cfg"]["prefix"]):].split()[0]
   if cmd in db["cmds"]:
    await message.channel.send(db["cmds"][cmd])
  await bot.process_commands(message)
@@ -153,6 +153,6 @@ async def setup_hook():
 @bot.event
 async def on_ready():
  va.start()
- print("✅ V107 ONLINE - PARADOXO RP")
+ print("✅ V108 ONLINE - PARADOXO RP")
 
 bot.run(os.getenv("TOKEN"))
