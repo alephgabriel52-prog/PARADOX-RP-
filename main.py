@@ -3,10 +3,10 @@ from discord.ext import commands,tasks
 from flask import Flask
 from threading import Thread
 
-print("INICIANDO V100...")
+print("INICIANDO V101...")
 app=Flask('')
 @app.route('/')
-def h():return"V100 PARADOXO RP"
+def h():return"V101 PARADOXO RP"
 Thread(target=lambda:app.run(host='0.0.0.0',port=8080)).start()
 
 intents=discord.Intents.all()
@@ -23,17 +23,17 @@ def is_staff():
  async def p(ctx):return ctx.author.guild_permissions.administrator or ctx.author.id==1438010935783460954
  return commands.check(p)
 
-# BOTÃO DA WHITELIST
+# BOTÃO CORRIGIDO COM CUSTOM_ID
 class WLButton(discord.ui.View):
  def __init__(self):super().__init__(timeout=None)
- @discord.ui.button(label="INICIAR WHITELIST",style=discord.ButtonStyle.green,emoji="📝")
+ @discord.ui.button(label="INICIAR WHITELIST",style=discord.ButtonStyle.green,emoji="📝",custom_id="wl_start_btn")
  async def btn(self,interaction:discord.Interaction,button:discord.ui.Button):
   uid=str(interaction.user.id)
   if uid in db["wl"] and db["wl"][uid]["status"]=="aprovado":
-   return await interaction.response.send_message("❌ Você já foi **APROVADO** e não precisa fazer mais",ephemeral=True)
+   return await interaction.response.send_message("❌ Você já foi **APROVADO**",ephemeral=True)
   await interaction.response.send_message("📩 Te mandei as perguntas no PV!",ephemeral=True)
   try:
-   await interaction.user.send("**WHITELIST PARADOXO RP**\nResponda as perguntas:\n\n1. Qual seu nome e idade?")
+   await interaction.user.send("**WHITELIST PARADOXO RP**\n1. Qual seu nome e idade?")
    r1=await bot.wait_for('message',check=lambda m:m.author==interaction.user and isinstance(m.channel,discord.DMChannel),timeout=300)
    await interaction.user.send("2. Já jogou RP antes? Qual cidade?")
    r2=await bot.wait_for('message',check=lambda m:m.author==interaction.user and isinstance(m.channel,discord.DMChannel),timeout=300)
@@ -61,29 +61,6 @@ async def va():
    if c:await c.send("@everyone",embed=discord.Embed(title="📢 ANÚNCIO PARADOXO RP",description=x["m"],color=0xFF0000).set_image(url=BANNER))
    db["an"].remove(x);sv()
 
-# COMANDOS
-@bot.command()
-@is_staff()
-async def anuncio(ctx): #... mesmo do anterior
- await ctx.send("📢 **1/3** Manda o ID do CANAL")
- m=await bot.wait_for('message',check=lambda x:x.author==ctx.author,timeout=60)
- await ctx.send("📝 **2/3** Manda a MENSAGEM")
- msg=await bot.wait_for('message',check=lambda x:x.author==ctx.author,timeout=120)
- await ctx.send("⏰ **3/3** Manda o HORÁRIO HH:MM")
- hr=await bot.wait_for('message',check=lambda x:x.author==ctx.author,timeout=60)
- db["an"].append({"id":len(db["an"])+1,"c":int(m.content),"m":msg.content,"h":hr.content});sv()
- await ctx.send(f"✅ **Agendado!** ID: `{len(db['an'])}`")
-
-@bot.command()
-@is_staff()
-async def setwlchannel(ctx,ch:discord.TextChannel):
- db["cfg"]["wc"]=ch.id;sv();await ctx.send(f"✅ Canal de whitelist definido: {ch.mention}")
-
-@bot.command()
-@is_staff()
-async def setstaffcargo(ctx,role:discord.Role):
- db["cfg"]["sc"]=role.id;sv();await ctx.send(f"✅ Cargo da STAFF definido: {role.name}")
-
 @bot.command()
 async def whitelist(ctx):
  embed=discord.Embed(title="📝 WHITELIST PARADOXO RP",description="✅ APROVADO = não faz mais\n🔄 REPROVADO = pode tentar de novo\nClique no botão abaixo para iniciar!",color=0xFF0000).set_image(url=BANNER)
@@ -91,24 +68,32 @@ async def whitelist(ctx):
 
 @bot.command()
 @is_staff()
+async def setwlchannel(ctx,ch:discord.TextChannel):
+ db["cfg"]["wc"]=ch.id;sv();await ctx.send(f"✅ Canal de whitelist: {ch.mention}")
+
+@bot.command()
+@is_staff()
+async def setstaffcargo(ctx,role:discord.Role):
+ db["cfg"]["sc"]=role.id;sv();await ctx.send(f"✅ Cargo STAFF: {role.name}")
+
+@bot.command()
+@is_staff()
 async def aprovar(ctx,member:discord.Member):
  db["wl"][str(member.id)]["status"]="aprovado";sv()
- await member.send("✅ **PARABÉNS!** Você foi APROVADO na whitelist do Paradoxo RP!")
+ await member.send("✅ **APROVADO** na whitelist do Paradoxo RP!")
  await ctx.send(f"✅ {member.mention} **APROVADO**")
 
 @bot.command()
 @is_staff()
 async def reprovar(ctx,member:discord.Member,*,motivo="Sem motivo"):
  db["wl"][str(member.id)]["status"]="reprovado";sv()
- await member.send(f"❌ Você foi REPROVADO na whitelist.\nMotivo: {motivo}\nPode tentar novamente!")
+ await member.send(f"❌ **REPROVADO**\nMotivo: {motivo}\nPode tentar novamente!")
  await ctx.send(f"❌ {member.mention} **REPROVADO**")
-
-#... todos os outros comandos: limpar, ban, kick, mute, warn, antiraid
 
 @bot.event
 async def on_ready():
  va.start()
- bot.add_view(WLButton())
- print("✅ V100 ONLINE - PARADOXO RP")
+ bot.add_view(WLButton()) # REGISTRA O BOTÃO PRA FICAR PERSISTENTE
+ print("✅ V101 ONLINE - PARADOXO RP")
 
 bot.run(os.getenv("TOKEN"))
