@@ -3,10 +3,10 @@ from discord.ext import commands,tasks
 from flask import Flask
 from threading import Thread
 
-print("INICIANDO V126...")
+print("INICIANDO V127...")
 app=Flask('')
 @app.route('/')
-def h():return"V126 NOSSO RP"
+def h():return"V127 NOSSO RP"
 Thread(target=lambda:app.run(host='0.0.0.0',port=8080)).start()
 
 intents=discord.Intents.all()
@@ -17,8 +17,8 @@ BANNER="https://cdn.discordapp.com/attachments/1527669780364918925/1549093554960
 DONO=1438010935783460954
 
 CANAL_WL_ID = 1527669780364918925
-CARGO_STAFF_ID = 0 # TROCA PELO ID DO CARGO STAFF
-CAT_TICKET_ID = 1526291631467397400 # TROCA PELA ID DA CATEGORIA
+CARGO_STAFF_ID = 0 
+CAT_TICKET_ID = 1526291631467397400 
 
 try:db=json.load(open('db.json'))
 except:db={"cfg":{"tc":CAT_TICKET_ID,"sc":CARGO_STAFF_ID,"wc":CANAL_WL_ID,"tr":DONO,"banner":BANNER,"prefix":"!"},"an":[],"raid":{"on":False,"lim":5},"wl":{},"warns":{},"cmds":{},"tickets":{},"awaiting":{}}
@@ -51,7 +51,7 @@ async def criar_ticket(guild,user):
 
 class ConfigPanel(discord.ui.View):
  def __init__(self):super().__init__(timeout=None)
- @discord.ui.select(placeholder="⚙️ SELECIONE O QUE QUER CONFIGURAR",custom_id="config_select_v126",options=[discord.SelectOption(label="Canal de Whitelist",emoji="📝",value="wc"),discord.SelectOption(label="Cargo da Staff",emoji="👮",value="sc"),discord.SelectOption(label="Categoria de Tickets",emoji="📂",value="tc"),discord.SelectOption(label="Anti-Raid ON/OFF",emoji="🚨",value="raid"),discord.SelectOption(label="Limite Anti-Raid",emoji="🔢",value="lim"),discord.SelectOption(label="Trocar Banner",emoji="🖼️",value="banner"),discord.SelectOption(label="Prefixo do Bot",emoji="#️⃣",value="prefix"),discord.SelectOption(label="Criar Comando Custom",emoji="➕",value="addcmd"),discord.SelectOption(label="Deletar Comando",emoji="➖",value="delcmd"),discord.SelectOption(label="Listar Comandos",emoji="📋",value="listcmd"),])
+ @discord.ui.select(placeholder="⚙️ SELECIONE O QUE QUER CONFIGURAR",custom_id="config_select_v127",options=[discord.SelectOption(label="Canal de Whitelist",emoji="📝",value="wc"),discord.SelectOption(label="Cargo da Staff",emoji="👮",value="sc"),discord.SelectOption(label="Categoria de Tickets",emoji="📂",value="tc"),discord.SelectOption(label="Anti-Raid ON/OFF",emoji="🚨",value="raid"),discord.SelectOption(label="Limite Anti-Raid",emoji="🔢",value="lim"),discord.SelectOption(label="Trocar Banner",emoji="🖼️",value="banner"),discord.SelectOption(label="Prefixo do Bot",emoji="#️⃣",value="prefix"),discord.SelectOption(label="Criar Comando Custom",emoji="➕",value="addcmd"),discord.SelectOption(label="Deletar Comando",emoji="➖",value="delcmd"),discord.SelectOption(label="Listar Comandos",emoji="📋",value="listcmd"),])
  async def select(self,i,s):
   if i.user.id!=DONO and str(i.user.id)!=str(db["cfg"]["sc"]):return await i.response.send_message("❌ Sem permissão",ephemeral=True)
   op=s.values[0];uid=str(i.user.id);db["awaiting"][uid]=op;sv()
@@ -66,22 +66,22 @@ class StaffTicket(discord.ui.View):
   ch=bot.get_channel(self.cid)
   if ch:await ch.delete()
   for k in [self.uid,f"step_{self.uid}",f"res_{self.uid}"]:db["tickets"].pop(k,None);sv()
- @discord.ui.button(label="ACEITAR",style=discord.ButtonStyle.green,emoji="✅",custom_id="accept_ticket_v126")
+ @discord.ui.button(label="ACEITAR",style=discord.ButtonStyle.green,emoji="✅",custom_id="accept_ticket_v127")
  async def accept(self,i,b):
   if not (i.user.guild_permissions.administrator or i.user.id==DONO or str(i.user.id)==str(db["cfg"]["sc"])):return await i.response.send_message("❌ Só STAFF",ephemeral=True)
   db["wl"][self.uid]["status"]="aprovado";sv();await (await bot.fetch_user(int(self.uid))).send("✅ **APROVADO** no Nosso RP!");e=discord.Embed(title="✅ APROVADO",description=f"Aprovado por: {i.user.mention}",color=0x00FF00);await i.response.send_message(embed=e);await self.apagar(i)
- @discord.ui.button(label="RECUSAR",style=discord.ButtonStyle.red,emoji="❌",custom_id="deny_ticket_v126")
+ @discord.ui.button(label="RECUSAR",style=discord.ButtonStyle.red,emoji="❌",custom_id="deny_ticket_v127")
  async def deny(self,i,b):
   if not (i.user.guild_permissions.administrator or i.user.id==DONO or str(i.user.id)==str(db["cfg"]["sc"])):return await i.response.send_message("❌ Só STAFF",ephemeral=True)
   db["wl"][self.uid]["status"]="reprovado";sv();await (await bot.fetch_user(int(self.uid))).send("❌ **REPROVADO** no Nosso RP!");e=discord.Embed(title="❌ REPROVADO",description=f"Reprovado por: {i.user.mention}",color=0xFF0000);await i.response.send_message(embed=e);await self.apagar(i)
- @discord.ui.button(label="FECHAR",style=discord.ButtonStyle.gray,emoji="🔒",custom_id="close_ticket_v126")
+ @discord.ui.button(label="FECHAR",style=discord.ButtonStyle.gray,emoji="🔒",custom_id="close_ticket_v127")
  async def close(self,i,b):
   if not (i.user.guild_permissions.administrator or i.user.id==DONO or str(i.user.id)==str(db["cfg"]["sc"])):return await i.response.send_message("❌ Só STAFF",ephemeral=True)
   e=discord.Embed(title="🔒 TICKET FECHADO",description=f"Fechado por: {i.user.mention}",color=0x808080);await i.response.send_message(embed=e);await self.apagar(i)
 
 class WLStartButton(discord.ui.View):
  def __init__(self):super().__init__(timeout=None)
- @discord.ui.button(label="INICIAR WHITELIST",style=discord.ButtonStyle.green,emoji="📝",custom_id="wl_ticket_v126")
+ @discord.ui.button(label="INICIAR WHITELIST",style=discord.ButtonStyle.green,emoji="📝",custom_id="wl_ticket_v127")
  async def start(self,i,b):
   ch,erro=await criar_ticket(i.guild,i.user)
   if erro:return await i.response.send_message(erro,ephemeral=True)
@@ -188,7 +188,7 @@ async def warn(ctx,member:discord.Member,*,motivo):
 async def warns(ctx,member:discord.Member):
  uid=str(member.id)
  if uid not in db["warns"] or not db["warns"][uid]:return await ctx.send("✅ Sem warns")
- txt="\n".join([f"{i+1}. {w}" for i,w in enumerate(db['warns'][uid]) # AQUI EU FECHEI O )
+ txt="\n".join([f"{i+1}. {w}" for i,w in enumerate(db['warns'][uid])
  await ctx.send(embed=discord.Embed(title=f"WARNS DE {member.name}",description=txt,color=0xFFFF00))
 
 @bot.command()
@@ -234,6 +234,6 @@ async def setup_hook():
 @bot.event
 async def on_ready():
  va.start()
- print("✅ V126 ONLINE - TUDO FUNCIONANDO")
+ print("✅ V127 ONLINE")
 
 bot.run(os.getenv("TOKEN"))
