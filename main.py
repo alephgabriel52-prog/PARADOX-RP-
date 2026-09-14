@@ -20,11 +20,12 @@ except: db = {"config":{}, "tickets":{}, "whitelist":{}, "warns":{}}
 def save(): json.dump(db, open(ARQUIVO,'w',encoding='utf-8'), ensure_ascii=False, indent=4)
 
 OWNER_ID = 1438010935783460954
-GUILD_ID = COLA_ID_AQUI # <--- TROCA AQUI
+GUILD_ID = 1526291625763143770
 
 BANNER_SUPORTE = "https://cdn.discordapp.com/attachments/1481856611587723295/1549067503588606033/file_00000136881f58a07836a66e4246c.png?ex=6aa95909&is=6aa80789&hm=bdc18d543ecb36c4417854a67c81826d27438297b74e41549a177b1843797a43"
 BANNER_BOT = "https://cdn.discordapp.com/attachments/1481856611587723295/1549067503890866176/IMG_20260914_111956.jpg?ex=6aa95909&is=6aa80789&hm=e56e7317913f32b44715d63482cabc005132d429ed7e0eb7a61f7ab3c2e56181"
 
+# ============ TICKET ============
 class TicketSelect(Select):
     def __init__(self):
         options = [
@@ -35,7 +36,7 @@ class TicketSelect(Select):
         ]
         super().__init__(placeholder="Selecione o motivo do seu ticket", min_values=1, max_values=1, options=options)
     async def callback(self, interaction: discord.Interaction): await interaction.response.send_modal(TicketMotivo(self.values[0]))
-class TicketPainel(View): 
+class TicketPainel(View):
     def __init__(self): super().__init__(timeout=None); self.add_item(TicketSelect())
 class TicketAcoes(View):
     def __init__(self, user_id, tipo): super().__init__(timeout=None); self.user_id = user_id; self.tipo = tipo
@@ -71,7 +72,8 @@ class TicketMotivo(Modal):
         await canal.send(f"{i.user.mention}\n**Tipo:** {self.tipo}\n**Motivo:** {self.motivo.value}", view=TicketAcoes(i.user.id, self.tipo))
         await i.response.send_message(f"✅ Ticket: {canal.mention}", ephemeral=True)
 
-class WhitelistPainel(View): 
+# ============ WHITELIST ============
+class WhitelistPainel(View):
     @discord.ui.button(label="📝 Fazer Whitelist", style=discord.ButtonStyle.success)
     async def fazer(self, i, b): await i.response.send_modal(WhitelistEtapa1())
 class WhitelistEtapa1(Modal, title="Whitelist 1/4"):
@@ -114,6 +116,7 @@ def is_staff():
         return False
     return app_commands.check(predicate)
 
+# ============ COMANDOS ============
 @bot.tree.command(name="ticket", guild=discord.Object(id=GUILD_ID))
 async def ticket(i: discord.Interaction):
     embed = discord.Embed(title="🎫 CENTRAL DE ATENDIMENTO", color=0xFF0000)
@@ -171,11 +174,17 @@ async def config(i: discord.Interaction):
     if i.user.id!= OWNER_ID: return await i.response.send_message("❌ Só o dono", ephemeral=True)
     await i.response.send_modal(ConfigModal())
 
+@bot.tree.command(name="antiraid", guild=discord.Object(id=GUILD_ID))
+async def antiraid(i: discord.Interaction, ativo: bool):
+    if i.user.id!= OWNER_ID: return await i.response.send_message("❌ Só o dono", ephemeral=True)
+    db["config"]["antiraid"]=ativo; save()
+    await i.response.send_message(f"✅ Anti-Raid: {'ON' if ativo else 'OFF'}", ephemeral=True)
+
 @bot.event
 async def on_ready():
     guild = discord.Object(id=GUILD_ID)
     bot.tree.clear_commands(guild=guild)
     await bot.tree.sync(guild=guild)
-    print(f'✅ V76 ONLINE - COMANDOS FORÇADOS NO SERVER')
+    print(f'✅ V80 ONLINE - COMANDOS FORÇADOS NO SERVER 1526291625763143770')
 
 bot.run(os.getenv("TOKEN"))
