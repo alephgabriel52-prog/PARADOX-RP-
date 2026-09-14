@@ -6,7 +6,7 @@ from threading import Thread
 
 app = Flask('')
 @app.route('/')
-def home(): return "Bot Online V96"
+def home(): return "Bot Online V97"
 Thread(target=lambda: app.run(host='0.0.0.0', port=8080)).start()
 
 intents = discord.Intents.all()
@@ -18,17 +18,27 @@ try: db = json.load(open(ARQUIVO,'r',encoding='utf-8'))
 except: db = {"config":{}, "tickets":{}, "whitelist":{}, "warns":{}, "anuncios":[]}
 def save(): json.dump(db, open(ARQUIVO,'w',encoding='utf-8'), ensure_ascii=False, indent=4)
 
-OWNER_ID = 1438010935783460954
+# CONFIGURA AQUI OS SEUS IDs PRA NÃO PRECISAR DE!botconfig
+CONFIG = {
+    "ticket_categoria": 0, # COLA O ID DA CATEGORIA AQUI
+    "staff_cargo": 0, # COLA O ID DO CARGO STAFF AQUI 
+    "whitelist_canal": 0, # COLA O ID DO CANAL WHITELIST AQUI
+    "transcript_canal": 0, # COLA O ID DO CANAL TRANSCRIPT AQUI
+    "owner_id": 1438010935783460954
+}
+db["config"] = CONFIG
+save()
+
 BANNER_FAIXA = "https://cdn.discordapp.com/attachments/1527669780364918925/1549093554960474243/file_0005a0820e8df98c1974ab6ecc.png"
 
 def is_staff():
     async def predicate(ctx):
-        return any(r.id == db["config"].get("staff_cargo") for r in ctx.author.roles) or ctx.author.id == OWNER_ID
+        return any(r.id == db["config"].get("staff_cargo") for r in ctx.author.roles) or ctx.author.id == db["config"]["owner_id"]
     return commands.check(predicate)
 
 def is_admin():
     async def predicate(ctx):
-        return ctx.author.guild_permissions.administrator or ctx.author.id == OWNER_ID
+        return ctx.author.guild_permissions.administrator or ctx.author.id == db["config"]["owner_id"]
     return commands.check(predicate)
 
 @tasks.loop(minutes=1)
@@ -38,7 +48,7 @@ async def verificar_anuncios():
         if anuncio["hora"] == agora:
             canal = bot.get_channel(anuncio["canal"])
             if canal:
-                embed = discord.Embed(title="📢 ANÚNCIO", description=anuncio["mensagem"], color=0xFF0000)
+                embed = discord.Embed(title="📢 ANÚNCIO PARADOXO RP", description=anuncio["mensagem"], color=0xFF0000)
                 embed.set_image(url=BANNER_FAIXA)
                 embed.set_footer(text=f"Agendado por {anuncio['autor']} • ID: {anuncio['id']}")
                 await canal.send("@everyone", embed=embed)
@@ -57,6 +67,7 @@ class TicketSelect(discord.ui.Select):
         ]
         super().__init__(placeholder="📩 Selecione o motivo do seu ticket", min_values=1, max_values=1, options=options)
     async def callback(self, i: discord.Interaction):
+        if db["config"]["ticket_categoria"] == 0: return await i.response.send_message("❌ **ADMIN CONFIGURA OS IDS NO CÓDIGO PRIMEIRO**", ephemeral=True)
         tipo = self.values[0]; user_id = str(i.user.id)
         if db["tickets"].get(user_id, {}).get(tipo):
             canal_id = db["tickets"][user_id][tipo]
@@ -92,7 +103,7 @@ class FecharMotivo(discord.ui.Modal, title="Fechar Ticket"):
         file = discord.File(io.BytesIO("\n".join(reversed(msgs)).encode('utf-8')), filename=f"transcript-{self.cid}.txt")
         embed = discord.Embed(title=f"📁 Transcript - {self.tipo}", color=0xFF0000)
         embed.set_image(url=BANNER_FAIXA)
-        if db["config"].get("transcript_canal"): await bot.get_channel(db["config"]["transcript_canal"]).send(embed=embed, file=file)
+        if db["config"].get("transcript_canal")!= 0: await bot.get_channel(db["config"]["transcript_canal"]).send(embed=embed, file=file)
         db["tickets"][str(self.user_id)].pop(self.tipo, None); db["tickets"].pop(str(self.cid), None); save()
         await i.response.send_message("🔒 Fechando..."); await asyncio.sleep(3); await i.channel.delete()
 
@@ -115,6 +126,7 @@ class TicketMotivo(discord.ui.Modal):
 class WhitelistPainel(discord.ui.View):
     @discord.ui.button(label="📝 Fazer Whitelist", style=discord.ButtonStyle.success)
     async def fazer(self, i, b):
+        if db["config"]["whitelist_canal"] == 0: return await i.response.send_message("❌ **ADMIN CONFIGURA OS IDS NO CÓDIGO PRIMEIRO**", ephemeral=True)
         if db["whitelist"].get(str(i.user.id), {}).get("status") == "aprovado": return await i.response.send_message("❌ Já aprovado.", ephemeral=True)
         if db["whitelist"].get(str(i.user.id), {}).get("status") == "em_analise": return await i.response.send_message("⏳ Em análise.", ephemeral=True)
         await i.response.send_modal(WhitelistEtapa1())
@@ -152,7 +164,7 @@ class WhitelistEtapa4(discord.ui.Modal, title="Whitelist 4/4"):
         uid = str(self.uid)
         db["whitelist"][uid]["e4"]=[self.r1.value,self.r2.value,self.r3.value,self.r4.value,self.r5.value]
         db["whitelist"][uid]["status"] = "em_analise"; save()
-        if db["config"].get("whitelist_canal"):
+        if db["config"].get("whitelist_canal")!= 0:
             canal = bot.get_channel(db["config"]["whitelist_canal"])
             embed = discord.Embed(title=f"📝 Nova Whitelist - {i.user.name}", color=0xFF0000)
             embed.set_image(url=BANNER_FAIXA)
@@ -161,7 +173,7 @@ class WhitelistEtapa4(discord.ui.Modal, title="Whitelist 4/4"):
 
 @bot.command(name="ticket")
 async def ticket(ctx):
-    embed = discord.Embed(title="🎫 Painel de Atendimento", description="Escolha o motivo abaixo.", color=0xFF0000)
+    embed = discord.Embed(title="🎫 Painel de Atendimento PARADOXO RP", description="Escolha o motivo abaixo.", color=0xFF0000)
     embed.set_image(url=BANNER_FAIXA)
     await ctx.send(embed=embed, view=TicketPainel())
 
@@ -218,22 +230,9 @@ async def adiaranuncio(ctx, id: int, nova_hora: str):
             return await ctx.send(f"✅ Anúncio **ID: {id}** adiado de `{hora_antiga}` para `{nova_hora}`")
     await ctx.send("❌ ID não encontrado.")
 
-@bot.command(name="botconfig")
-@commands.check(lambda ctx: ctx.author.id == OWNER_ID)
-async def botconfig(ctx):
-    await ctx.send("⚙️ Manda os 4 IDs:\n1. CATEGORIA Ticket\n2. CARGO Staff\n3. CANAL Whitelist\n4. CANAL Transcript")
-    def check(m): return m.author.id == OWNER_ID and m.channel == ctx.channel
-    try:
-        cat = await bot.wait_for('message', timeout=60.0, check=check); db["config"]["ticket_categoria"] = int(cat.content)
-        staff = await bot.wait_for('message', timeout=60.0, check=check); db["config"]["staff_cargo"] = int(staff.content)
-        wl = await bot.wait_for('message', timeout=60.0, check=check); db["config"]["whitelist_canal"] = int(wl.content)
-        trans = await bot.wait_for('message', timeout=60.0, check=check); db["config"]["transcript_canal"] = int(trans.content)
-        save(); await ctx.send("✅ Configurado!")
-    except: await ctx.send("❌ Erro")
-
 @bot.event
 async def on_ready():
     verificar_anuncios.start()
-    print(f'✅ V96 ONLINE')
+    print(f'✅ V97 ONLINE - PARADOXO RP')
 
 bot.run(os.getenv("TOKEN"))
