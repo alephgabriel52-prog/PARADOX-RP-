@@ -6,7 +6,7 @@ from threading import Thread
 
 app = Flask('')
 @app.route('/')
-def home(): return "Bot Online V90"
+def home(): return "Bot Online V91"
 Thread(target=lambda: app.run(host='0.0.0.0', port=8080)).start()
 
 intents = discord.Intents.all()
@@ -22,7 +22,6 @@ OWNER_ID = 1438010935783460954
 BANNER_VERMELHO = "https://cdn.discordapp.com/attachments/1481856611587723295/1549067503588606033/file_00000136881f58a07836a66e4246c.png"
 BANNER_BOT = "https://cdn.discordapp.com/attachments/1481856611587723295/1549067503890866176/IMG_20260914_111956.jpg"
 
-# ============ TICKET COM BLOQUEIO ============
 class TicketSelect(discord.ui.Select):
     def __init__(self):
         options = [
@@ -73,8 +72,16 @@ class TicketMotivo(discord.ui.Modal):
     motivo = discord.ui.TextInput(label="Descreva", style=discord.TextStyle.paragraph)
     async def on_submit(self, i):
         if not db["config"].get("ticket_categoria"): return await i.response.send_message("❌ Configure com `!botconfig`", ephemeral=True)
+        
         cat = bot.get_channel(db["config"]["ticket_categoria"])
-        canal = await i.guild.create_text_channel(f"ticket-{self.tipo}-{i.user.name}", category=cat)
+        if not cat or cat.type!= discord.ChannelType.category:
+            return await i.response.send_message("❌ ERRO: O ID salvo não é de uma CATEGORIA! Use `!botconfig` e cole o ID da pasta.", ephemeral=True)
+        
+        try:
+            canal = await i.guild.create_text_channel(f"ticket-{self.tipo}-{i.user.name}", category=cat)
+        except discord.HTTPException:
+            return await i.response.send_message("❌ Não consegui criar o canal. Verifique se o ID da categoria está correto.", ephemeral=True)
+            
         await canal.set_permissions(i.guild.default_role, read_messages=False)
         await canal.set_permissions(i.user, read_messages=True, send_messages=True)
         if str(i.user.id) not in db["tickets"]: db["tickets"][str(i.user.id)] = {}
@@ -83,15 +90,12 @@ class TicketMotivo(discord.ui.Modal):
         await canal.send(f"{i.user.mention}\n**Tipo:** {self.tipo}\n**Motivo:** {self.motivo.value}", view=TicketAcoes(i.user.id, self.tipo))
         await i.response.send_message(f"✅ Ticket: {canal.mention}", ephemeral=True)
 
-# ============ WHITELIST COM APROVAR/REPROVAR ============
 class WhitelistPainel(discord.ui.View):
     @discord.ui.button(label="📝 Fazer Whitelist", style=discord.ButtonStyle.success)
     async def fazer(self, i, b):
         user_data = db["whitelist"].get(str(i.user.id), {})
-        if user_data.get("status") == "aprovado":
-            return await i.response.send_message("❌ Você já foi aprovado na whitelist. Não pode fazer novamente.", ephemeral=True)
-        if user_data.get("status") == "em_analise":
-            return await i.response.send_message("⏳ Sua whitelist já está em análise. Aguarde a STAFF.", ephemeral=True)
+        if user_data.get("status") == "aprovado": return await i.response.send_message("❌ Você já foi aprovado na whitelist.", ephemeral=True)
+        if user_data.get("status") == "em_analise": return await i.response.send_message("⏳ Sua whitelist já está em análise.", ephemeral=True)
         await i.response.send_modal(WhitelistEtapa1())
 
 class WhitelistAcoesStaff(discord.ui.View):
@@ -101,16 +105,15 @@ class WhitelistAcoesStaff(discord.ui.View):
         if not any(r.id == db["config"].get("staff_cargo") for r in i.user.roles): return await i.response.send_message("❌ Só STAFF", ephemeral=True)
         db["whitelist"][str(self.user_id)]["status"] = "aprovado"; save()
         user = await bot.fetch_user(self.user_id)
-        await user.send("🎉 **PARABÉNS!** Sua whitelist foi **APROVADA**!\nVocê já pode entrar no servidor.")
-        await i.response.edit_message(content=f"✅ Whitelist de {user.mention} **APROVADA** por {i.user.mention}", view=None)
-    
+        await user.send("🎉 **APROVADO!** Sua whitelist foi aceita.")
+        await i.response.edit_message(content=f"✅ Whitelist de {user.mention} **APROVADA**", view=None)
     @discord.ui.button(label="❌ Reprovar", style=discord.ButtonStyle.red)
     async def reprovar(self, i, b):
         if not any(r.id == db["config"].get("staff_cargo") for r in i.user.roles): return await i.response.send_message("❌ Só STAFF", ephemeral=True)
-        db["whitelist"][str(self.user_id)]["status"] = "reprovado"; save() # Libera pra fazer de novo
+        db["whitelist"][str(self.user_id)]["status"] = "reprovado"; save()
         user = await bot.fetch_user(self.user_id)
-        await user.send("❌ Sua whitelist foi **REPROVADA**.\nVocê pode fazer novamente quando quiser.")
-        await i.response.edit_message(content=f"❌ Whitelist de {user.mention} **REPROVADA** por {i.user.mention}\nO player pode tentar novamente.", view=None)
+        await user.send("❌ **REPROVADO!** Você pode fazer a whitelist novamente.")
+        await i.response.edit_message(content=f"❌ Whitelist de {user.mention} **REPROVADA**", view=None)
 
 class WhitelistEtapa1(discord.ui.Modal, title="Whitelist 1/4"):
     r1=discord.ui.TextInput(label="1. O que é RDM?"); r2=discord.ui.TextInput(label="2. O que é VDM?"); r3=discord.ui.TextInput(label="3. Meta Gaming?"); r4=discord.ui.TextInput(label="4. Power Gaming?"); r5=discord.ui.TextInput(label="5. Combat Log?")
@@ -129,29 +132,26 @@ class WhitelistEtapa4(discord.ui.Modal, title="Whitelist 4/4"):
     async def on_submit(self, i):
         uid = str(self.uid)
         db["whitelist"][uid]["e4"]=[self.r1.value,self.r2.value,self.r3.value,self.r4.value,self.r5.value]
-        db["whitelist"][uid]["status"] = "em_analise"
-        save()
+        db["whitelist"][uid]["status"] = "em_analise"; save()
         if db["config"].get("whitelist_canal"):
             canal = bot.get_channel(db["config"]["whitelist_canal"])
             embed = discord.Embed(title=f"📝 Nova Whitelist - {i.user.name}", color=0xFEE75C)
-            embed.add_field(name="Status", value="Em análise", inline=False)
             await canal.send(f"{i.user.mention}", embed=embed, view=WhitelistAcoesStaff(uid))
-        await i.response.send_message("✅ Whitelist enviada para análise da STAFF!", ephemeral=True)
+        await i.response.send_message("✅ Whitelist enviada!", ephemeral=True)
 
-# ============ COMANDOS ============
 @bot.command(name="ticket")
 async def ticket(ctx):
     embed = discord.Embed(
         title="🎫 Painel de Atendimento",
         description=(
-            "Bem-vindo ao painel de suporte. Escolha abaixo o caminho que trouxe você até aqui:\n\n"
+            "Bem-vindo ao painel de suporte.\n\n"
             "💬 **Suporte:** dúvidas, erros ou pedidos de ajuda.\n"
             "🤝 **Parcerias:** propostas e colaborações.\n"
             "🚨 **Denúncias:** usuários ou comportamentos indevidos.\n"
             "💰 **Pagamentos:** dúvidas ou problemas com compras.\n"
             "❓ **Outros:** qualquer assunto não listado.\n\n"
-            "🕐 **Depois de abrir seu ticket, aguarde com paciência.**\n"
-            "⚠️ **Você só pode ter 1 ticket aberto por categoria.**"
+            "🕐 **Depois de abrir seu ticket, aguarde.**\n"
+            "⚠️ **1 ticket por categoria.**"
         ),
         color=0xFF0000
     )
@@ -163,7 +163,7 @@ async def ticket(ctx):
 async def whitelist(ctx):
     embed = discord.Embed(
         title="📝 WHITELIST PARADOXO RP",
-        description="Clique no botão abaixo para iniciar sua whitelist.\n\n**Regras:**\n✅ Se for **APROVADO** não poderá fazer mais.\n🔄 Se for **REPROVADO** poderá tentar novamente.",
+        description="Clique abaixo para iniciar.\n\n**Regras:**\n✅ **APROVADO** = não faz mais\n🔄 **REPROVADO** = pode tentar de novo",
         color=0x57F287
     )
     embed.set_image(url=BANNER_BOT)
@@ -172,16 +172,16 @@ async def whitelist(ctx):
 @bot.command(name="botconfig")
 @commands.check(lambda ctx: ctx.author.id == OWNER_ID)
 async def botconfig(ctx):
-    msg = await ctx.send("⚙️ Manda os 3 IDs:\n1. Categoria Ticket\n2. Cargo Staff\n3. Canal Whitelist")
+    await ctx.send("⚙️ Manda os 3 IDs:\n1. **ID DA CATEGORIA** de Ticket\n2. **ID DO CARGO** Staff\n3. **ID DO CANAL** Whitelist")
     def check(m): return m.author.id == OWNER_ID and m.channel == ctx.channel
     try:
         cat = await bot.wait_for('message', timeout=60.0, check=check); db["config"]["ticket_categoria"] = int(cat.content)
         staff = await bot.wait_for('message', timeout=60.0, check=check); db["config"]["staff_cargo"] = int(staff.content)
         wl = await bot.wait_for('message', timeout=60.0, check=check); db["config"]["whitelist_canal"] = int(wl.content)
-        save(); await ctx.send("✅ Configurado!")
+        save(); await ctx.send("✅ Configurado! Teste com `!ticket`")
     except: await ctx.send("❌ Tempo acabou ou ID inválido")
 
 @bot.event
-async def on_ready(): print(f'✅ V90 ONLINE')
+async def on_ready(): print(f'✅ V91 ONLINE')
 
 bot.run(os.getenv("TOKEN"))
