@@ -3,10 +3,10 @@ from discord.ext import commands,tasks
 from flask import Flask
 from threading import Thread
 
-print("INICIANDO V108...")
+print("INICIANDO V109...")
 app=Flask('')
 @app.route('/')
-def h():return"V108 PARADOXO RP"
+def h():return"V109 NOSSO RP"
 Thread(target=lambda:app.run(host='0.0.0.0',port=8080)).start()
 
 intents=discord.Intents.all()
@@ -24,6 +24,24 @@ def sv():
 def is_staff():
  async def p(ctx):return ctx.author.guild_permissions.administrator or ctx.author.id==DONO or str(ctx.author.id)==db["cfg"]["sc"]
  return commands.check(p)
+
+PERGUNTAS=[
+ "1. Qual seu nome completo e idade?",
+ "2. Você tem microfone? Sabe usar?",
+ "3. Já jogou RP antes? Qual cidade?",
+ "4. Qual seu nível de interpretação RP de 0 a 10?",
+ "5. O que é RDM?",
+ "6. O que é VDM?",
+ "7. O que é Meta Gaming?",
+ "8. O que é Power Gaming?",
+ "9. O que é Fail RP?",
+ "10. Por que quer entrar no Nosso RP?",
+ "11. Você leu todas as regras? Concorda com elas?",
+ "12. Qual seu horário disponível para jogar?",
+ "13. Tem experiência com profissões? Qual?",
+ "14. O que você faria se visse alguém quebrando regra?",
+ "15. Deixe um recado final para a STAFF"
+]
 
 class ConfigPanel(discord.ui.View):
  def __init__(self):super().__init__(timeout=300)
@@ -47,7 +65,7 @@ class ConfigPanel(discord.ui.View):
   elif op=="lim":await interaction.response.send_message("🔢 Manda o novo limite. Ex: 3",ephemeral=True)
   elif op=="banner":await interaction.response.send_message("🖼️ Manda o LINK da nova banner",ephemeral=True)
   elif op=="prefix":await interaction.response.send_message("#️⃣ Manda o novo prefixo. Ex:.",ephemeral=True)
-  elif op=="addcmd":await interaction.response.send_message("➕ Manda: `nome | resposta`\nEx: `regras | Leia #regras`",ephemeral=True)
+  elif op=="addcmd":await interaction.response.send_message("➕ Manda: `nome | resposta`",ephemeral=True)
   elif op=="delcmd":await interaction.response.send_message("➖ Manda o nome do comando pra deletar",ephemeral=True)
   elif op=="listcmd":lista=", ".join(db['cmds'].keys()) if db['cmds'] else "Nenhum";await interaction.response.send_message(f"📋 Comandos: {lista}",ephemeral=True)
 
@@ -68,7 +86,7 @@ class StaffPanel(discord.ui.View):
    return await interaction.response.send_message("❌ Sem permissão",ephemeral=True)
   db["wl"][self.uid]["status"]="aprovado";sv()
   user=await bot.fetch_user(int(self.uid))
-  await user.send("✅ **APROVADO** na whitelist do Paradoxo RP!")
+  await user.send("✅ **APROVADO** na whitelist do Nosso RP!")
   await interaction.response.edit_message(content="✅ **APROVADO PELA STAFF**",embed=None,view=None)
  @discord.ui.button(label="REPROVAR",style=discord.ButtonStyle.red,emoji="❌",custom_id="wl_reprovar")
  async def reprovar(self,interaction:discord.Interaction,button:discord.ui.Button):
@@ -76,7 +94,7 @@ class StaffPanel(discord.ui.View):
    return await interaction.response.send_message("❌ Sem permissão",ephemeral=True)
   db["wl"][self.uid]["status"]="reprovado";sv()
   user=await bot.fetch_user(int(self.uid))
-  await user.send("❌ **REPROVADO** na whitelist. Pode tentar novamente!")
+  await user.send("❌ **REPROVADO** na whitelist do Nosso RP. Pode tentar novamente!")
   await interaction.response.edit_message(content="❌ **REPROVADO PELA STAFF**",embed=None,view=None)
 
 class WLButton(discord.ui.View):
@@ -86,21 +104,20 @@ class WLButton(discord.ui.View):
   uid=str(interaction.user.id)
   if uid in db["wl"] and db["wl"][uid]["status"]=="aprovado":
    return await interaction.response.send_message("❌ Você já foi **APROVADO**",ephemeral=True)
-  await interaction.response.send_message("📩 Te mandei as perguntas no PV!",ephemeral=True)
+  await interaction.response.send_message("📩 Te mandei as 15 perguntas no PV! Responde com calma.",ephemeral=True)
   try:
-   await interaction.user.send("**WHITELIST PARADOXO RP**\n1. Qual seu nome e idade?")
-   r1=await bot.wait_for('message',check=lambda m:m.author==interaction.user and isinstance(m.channel,discord.DMChannel),timeout=300)
-   await interaction.user.send("2. Já jogou RP antes? Qual cidade?")
-   r2=await bot.wait_for('message',check=lambda m:m.author==interaction.user and isinstance(m.channel,discord.DMChannel),timeout=300)
-   await interaction.user.send("3. Por que quer entrar no Paradoxo RP?")
-   r3=await bot.wait_for('message',check=lambda m:m.author==interaction.user and isinstance(m.channel,discord.DMChannel),timeout=300)
-   db["wl"][uid]={"r1":r1.content,"r2":r2.content,"r3":r3.content,"status":"pendente"};sv()
+   respostas={}
+   for i,perg in enumerate(PERGUNTAS):
+    await interaction.user.send(f"**WHITELIST NOSSO RP**\n{perg}")
+    r=await bot.wait_for('message',check=lambda m:m.author==interaction.user and isinstance(m.channel,discord.DMChannel),timeout=600)
+    respostas[f"p{i+1}"]=r.content
+
+   db["wl"][uid]=respostas;db["wl"][uid]["status"]="pendente";sv()
    ch=bot.get_channel(db["cfg"]["wc"])
    if ch:
     e=discord.Embed(title=f"📝 NOVA WHITELIST - {interaction.user.name}",color=0xFF0000)
-    e.add_field(name="1. Nome/Idade",value=r1.content,inline=False)
-    e.add_field(name="2. Exp RP",value=r2.content,inline=False)
-    e.add_field(name="3. Motivo",value=r3.content,inline=False)
+    for i,perg in enumerate(PERGUNTAS):
+     e.add_field(name=perg[:50],value=respostas[f"p{i+1}"][:100],inline=False)
     await ch.send(f"<@&{db['cfg']['sc']}>",embed=e,view=StaffPanel(uid))
    await interaction.user.send("✅ Enviado! Aguarde a STAFF analisar.")
   except:await interaction.user.send("❌ Tempo esgotou. Use!whitelist de novo")
@@ -111,18 +128,18 @@ async def va():
  for x in db["an"][:]:
   if x["h"]==a:
    c=bot.get_channel(x["c"])
-   if c:await c.send("@everyone",embed=discord.Embed(title="📢 ANÚNCIO PARADOXO RP",description=x["m"],color=0xFF0000).set_image(url=db["cfg"]["banner"]))
+   if c:await c.send("@everyone",embed=discord.Embed(title="📢 ANÚNCIO NOSSO RP",description=x["m"],color=0xFF0000).set_image(url=db["cfg"]["banner"]))
    db["an"].remove(x);sv()
 
 @bot.command()
 async def whitelist(ctx):
- embed=discord.Embed(title="📝 WHITELIST PARADOXO RP",description="✅ APROVADO = não faz mais\n🔄 REPROVADO = pode tentar de novo\nClique no botão abaixo para iniciar!",color=0xFF0000).set_image(url=db["cfg"]["banner"])
+ embed=discord.Embed(title="📝 WHITELIST NOSSO RP",description="✅ APROVADO = não faz mais\n🔄 REPROVADO = pode tentar de novo\nSão 15 perguntas. Clique no botão abaixo!",color=0xFF0000).set_image(url=db["cfg"]["banner"])
  await ctx.send(embed=embed,view=WLButton())
 
 @bot.command()
 async def botconfig(ctx):
  if ctx.author.id!=DONO and str(ctx.author.id)!=db["cfg"]["sc"]:return await ctx.send("❌ Só DONO/STAFF")
- e=discord.Embed(title="⚙️ CENTRAL DE CONTROLE PARADOXO",color=0xFF0000)
+ e=discord.Embed(title="⚙️ CENTRAL DE CONTROLE NOSSO RP",color=0xFF0000)
  e.add_field(name="📝 Canal WL",value=f"<#{db['cfg']['wc']}>" if db['cfg']['wc'] else "Não setado",inline=True)
  e.add_field(name="👮 Cargo STAFF",value=f"<@&{db['cfg']['sc']}>" if db['cfg']['sc'] else "Não setado",inline=True)
  e.add_field(name="🚨 Anti-Raid",value="ON" if db['raid']['on'] else "OFF",inline=True)
@@ -153,6 +170,6 @@ async def setup_hook():
 @bot.event
 async def on_ready():
  va.start()
- print("✅ V108 ONLINE - PARADOXO RP")
+ print("✅ V109 ONLINE - NOSSO RP")
 
 bot.run(os.getenv("TOKEN"))
