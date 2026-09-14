@@ -8,7 +8,7 @@ from threading import Thread
 
 app = Flask('')
 @app.route('/')
-def home(): return "Bot Online V81"
+def home(): return "Bot Online V82"
 Thread(target=lambda: app.run(host='0.0.0.0', port=8080)).start()
 
 intents = discord.Intents.all()
@@ -20,7 +20,7 @@ except: db = {"config":{}, "tickets":{}, "whitelist":{}, "warns":{}}
 def save(): json.dump(db, open(ARQUIVO,'w',encoding='utf-8'), ensure_ascii=False, indent=4)
 
 OWNER_ID = 1438010935783460954
-GUILD_ID = 1526291625763143770 # ID DO SEU SERVER JÁ COLADO
+GUILD_ID = 1526291625763143770
 
 BANNER_SUPORTE = "https://cdn.discordapp.com/attachments/1481856611587723295/1549067503588606033/file_00000136881f58a07836a66e4246c.png?ex=6aa95909&is=6aa80789&hm=bdc18d543ecb36c4417854a67c81826d27438297b74e41549a177b1843797a43"
 BANNER_BOT = "https://cdn.discordapp.com/attachments/1481856611587723295/1549067503890866176/IMG_20260914_111956.jpg?ex=6aa95909&is=6aa80789&hm=e56e7317913f32b44715d63482cabc005132d429ed7e0eb7a61f7ab3c2e56181"
@@ -67,7 +67,7 @@ class TicketMotivo(Modal):
     def __init__(self, tipo): super().__init__(title=f"Ticket: {tipo}"); self.tipo=tipo
     motivo = TextInput(label="Descreva", style=discord.TextStyle.paragraph)
     async def on_submit(self, i):
-        if not db["config"].get("ticket_categoria"): return await i.response.send_message("❌ Configure /config", ephemeral=True)
+        if not db["config"].get("ticket_categoria"): return await i.response.send_message("❌ Configure /config primeiro", ephemeral=True)
         cat = bot.get_channel(db["config"]["ticket_categoria"])
         canal = await i.guild.create_text_channel(f"ticket-{self.tipo}-{i.user.name}", category=cat)
         await canal.set_permissions(i.guild.default_role, read_messages=False)
@@ -76,11 +76,10 @@ class TicketMotivo(Modal):
         await canal.send(f"{i.user.mention}\n**Tipo:** {self.tipo}\n**Motivo:** {self.motivo.value}", view=TicketAcoes(i.user.id, self.tipo))
         await i.response.send_message(f"✅ Ticket: {canal.mention}", ephemeral=True)
 
-# ============ WHITELIST ============
+# ============ WHITELIST 4 ETAPAS ============
 class WhitelistPainel(View):
     @discord.ui.button(label="📝 Fazer Whitelist", style=discord.ButtonStyle.success)
     async def fazer(self, i, b): await i.response.send_modal(WhitelistEtapa1())
-
 class WhitelistEtapa1(Modal, title="Whitelist 1/4"):
     r1=TextInput(label="1. O que é RDM?"); r2=TextInput(label="2. O que é VDM?"); r3=TextInput(label="3. Meta Gaming?"); r4=TextInput(label="4. Power Gaming?"); r5=TextInput(label="5. Combat Log?")
     async def on_submit(self, i): db["whitelist"][str(i.user.id)]={"e1":[self.r1.value,self.r2.value,self.r3.value,self.r4.value,self.r5.value]}; save(); await i.response.send_modal(WhitelistEtapa2(i.user.id))
@@ -98,7 +97,7 @@ class WhitelistEtapa4(Modal):
     async def on_submit(self, i):
         db["whitelist"][str(self.uid)]["e4"]=[self.r1.value,self.r2.value,self.r3.value,self.r4.value,self.r5.value]; save()
         if db["config"].get("whitelist_canal"): await bot.get_channel(db["config"]["whitelist_canal"]).send(f"📝 Nova Whitelist: {i.user.mention}")
-        await i.response.send_message("✅ Enviada!", ephemeral=True)
+        await i.response.send_message("✅ Enviada pra STAFF!", ephemeral=True)
 
 class ConfigModal(Modal, title="⚙️ Configurar Bot"):
     ticket_cat = TextInput(label="ID da Categoria de Ticket")
@@ -111,7 +110,14 @@ class ConfigModal(Modal, title="⚙️ Configurar Bot"):
         db["config"]["whitelist_canal"]=int(self.whitelist_canal.value)
         if self.transcript_canal.value: db["config"]["transcript_canal"]=int(self.transcript_canal.value)
         save()
-        await i.response.send_message("✅ Configurado!", ephemeral=True)
+        await i.response.send_message("✅ Configurado com sucesso!", ephemeral=True)
+
+def is_owner():
+    async def predicate(i: discord.Interaction):
+        if i.user.id == OWNER_ID: return True
+        await i.response.send_message("❌ Só o dono do bot", ephemeral=True)
+        return False
+    return app_commands.check(predicate)
 
 def is_staff():
     async def predicate(i: discord.Interaction):
@@ -122,20 +128,40 @@ def is_staff():
     return app_commands.check(predicate)
 
 # ============ COMANDOS ============
-@bot.tree.command(name="ticket", guild=discord.Object(id=GUILD_ID))
+@bot.tree.command(name="ticket", description="Abre o painel de ticket", guild=discord.Object(id=GUILD_ID))
 async def ticket(i: discord.Interaction):
-    embed = discord.Embed(title="🎫 CENTRAL DE ATENDIMENTO", color=0xFF0000)
+    embed = discord.Embed(title="🎫 CENTRAL DE ATENDIMENTO", description="Selecione abaixo o motivo do seu atendimento", color=0xFF0000)
     embed.set_image(url=BANNER_SUPORTE)
     embed.set_footer(text=bot.user.name, icon_url=BANNER_BOT)
     await i.channel.send(embed=embed, view=TicketPainel())
     await i.response.send_message("✅ Painel enviado", ephemeral=True)
 
-@bot.tree.command(name="whitelist", guild=discord.Object(id=GUILD_ID))
+@bot.tree.command(name="whitelist", description="Abre o painel de whitelist", guild=discord.Object(id=GUILD_ID))
 async def whitelist(i: discord.Interaction):
-    embed = discord.Embed(title="📝 WHITELIST", color=0x57F287)
+    embed = discord.Embed(title="📝 WHITELIST", description="Clique no botão abaixo para iniciar", color=0x57F287)
     embed.set_image(url=BANNER_BOT)
     await i.channel.send(embed=embed, view=WhitelistPainel())
     await i.response.send_message("✅ Painel enviado", ephemeral=True)
+
+@bot.tree.command(name="config", description="Configure um ticket", guild=discord.Object(id=GUILD_ID))
+@is_owner()
+async def config(i: discord.Interaction):
+    await i.response.send_modal(ConfigModal())
+
+@bot.tree.command(name="config_painel", description="Configure um painel ticket", guild=discord.Object(id=GUILD_ID))
+@is_owner()
+async def config_painel(i: discord.Interaction):
+    await i.response.send_message("Use `/ticket` para enviar o painel de ticket e `/whitelist` para enviar o painel de whitelist", ephemeral=True)
+
+@bot.tree.command(name="botconfig", description="[Gerencie seu bot]", guild=discord.Object(id=GUILD_ID))
+@is_owner()
+async def botconfig(i: discord.Interaction):
+    embed = discord.Embed(title="⚙️ PAINEL DO BOT", color=0x5865F2)
+    embed.add_field(name="Ticket Categoria", value=f"<#{db['config'].get('ticket_categoria', 'Não definido')}>", inline=False)
+    embed.add_field(name="Cargo Staff", value=f"<@&{db['config'].get('staff_cargo', 'Não definido')}>", inline=False)
+    embed.add_field(name="Canal Whitelist", value=f"<#{db['config'].get('whitelist_canal', 'Não definido')}>", inline=False)
+    embed.add_field(name="Anti-Raid", value="ON" if db["config"].get("antiraid") else "OFF", inline=False)
+    await i.response.send_message(embed=embed, ephemeral=True)
 
 @bot.tree.command(name="warn", guild=discord.Object(id=GUILD_ID))
 @is_staff()
@@ -165,31 +191,26 @@ async def ban(i: discord.Interaction, membro: discord.Member, motivo: str = "Sem
     await i.response.send_message(f"🔨 {membro.mention} foi banido")
 
 @bot.tree.command(name="logs", guild=discord.Object(id=GUILD_ID))
+@is_owner()
 async def logs(i: discord.Interaction):
-    if i.user.id!= OWNER_ID: return await i.response.send_message("❌ Só o dono", ephemeral=True)
     cat1 = await i.guild.create_category("📁 LOGS RP")
     cat2 = await i.guild.create_category("📁 LOGS SERVIDOR")
     ch1 = await i.guild.create_text_channel("📜・rp", category=cat1)
     ch2 = await i.guild.create_text_channel("🛡️・servidor", category=cat2)
     db["config"]["logs_rp"]=ch1.id; db["config"]["logs_servidor"]=ch2.id; save()
-    await i.response.send_message(f"✅ Logs criadas", ephemeral=True)
-
-@bot.tree.command(name="config", guild=discord.Object(id=GUILD_ID))
-async def config(i: discord.Interaction):
-    if i.user.id!= OWNER_ID: return await i.response.send_message("❌ Só o dono", ephemeral=True)
-    await i.response.send_modal(ConfigModal())
+    await i.response.send_message(f"✅ Logs criadas: {ch1.mention} e {ch2.mention}", ephemeral=True)
 
 @bot.tree.command(name="antiraid", guild=discord.Object(id=GUILD_ID))
+@is_owner()
 async def antiraid(i: discord.Interaction, ativo: bool):
-    if i.user.id!= OWNER_ID: return await i.response.send_message("❌ Só o dono", ephemeral=True)
     db["config"]["antiraid"]=ativo; save()
     await i.response.send_message(f"✅ Anti-Raid: {'ON' if ativo else 'OFF'}", ephemeral=True)
 
 @bot.event
 async def on_ready():
     guild = discord.Object(id=GUILD_ID)
-    bot.tree.clear_commands(guild=guild) # LIMPA TUDO ANTIGO
-    await bot.tree.sync(guild=guild) # FORÇA SYNC SÓ NESSE SERVER
-    print(f'✅ V81 ONLINE - ID: {GUILD_ID} - COMANDOS FORÇADOS')
+    bot.tree.clear_commands(guild=guild)
+    await bot.tree.sync(guild=guild)
+    print(f'✅ V82 ONLINE - ID: {GUILD_ID} - /config /config_painel /botconfig ADICIONADOS')
 
 bot.run(os.getenv("TOKEN"))
