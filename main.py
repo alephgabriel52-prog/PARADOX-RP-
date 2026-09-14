@@ -21,7 +21,7 @@ def save(): json.dump(db, open(ARQUIVO,'w',encoding='utf-8'), ensure_ascii=False
 
 OWNER_ID = 0 # 1438010935783460954
 
-PERGUNTAS_RP = ["1. O que é RDM?", "2. O que é VDM?", "3. O que é Meta Gaming?", "4. O que é Power Gaming?", "5. O que é Combat Log?","6. O que fazer em sequestro?", "7. Pode atirar de carro?", "8. O que é Fear RP?", "9. Como agir em assalto?", "10. O que é Favorecimento?","11. Pode roubar polícia?", "12. O que é Anti RP?", "13. Idade mínima facção?", "14. O que fazer se tomar DM?", "15. O que é Gatilho?","16. Pode usar info do Discord no jogo?", "17. O que é Coerência?", "18. O que fazer em abordagem?", "19. Pode mentir pra polícia?", "20. Descreva um RP"]
+PERGUNTAS_RP = ["1. O que é RDM?", "2. O que é VDM?", "3. O que é Meta Gaming?", "4. O que é Power Gaming?", "5. O que é Combat Log?","6. O que fazer em sequestro?", "7. Pode atirar de carro?", "8. O que é Fear RP?", "9. Como agir em assalto?", "10. O que é Favorecimento?","11. Pode roubar polícia?", "12. O que é Anti RP?", "13. Idade mínima facção?", "14. O que fazer se tomar DM?", "15. O que é Gatilho?","16. Pode usar info do Discord no jogo?", "17. O que é Coerência?", "18. O que fazer em abordagem?", "19. Por que que entra em nosso rp?", "20. Descreva um RP"]
 
 # TICKET
 class TicketPainel(View):
