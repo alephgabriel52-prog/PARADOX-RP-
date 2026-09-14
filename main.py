@@ -3,10 +3,10 @@ from discord.ext import commands,tasks
 from flask import Flask
 from threading import Thread
 
-print("INICIANDO V120...")
+print("INICIANDO V121...")
 app=Flask('')
 @app.route('/')
-def h():return"V120 NOSSO RP"
+def h():return"V121 NOSSO RP"
 Thread(target=lambda:app.run(host='0.0.0.0',port=8080)).start()
 
 intents=discord.Intents.all()
@@ -16,8 +16,14 @@ bot=commands.Bot(command_prefix="!",intents=intents)
 BANNER="https://cdn.discordapp.com/attachments/1527669780364918925/1549093554960474243/file_0005a0820e8df98c1974ab6ecc.png"
 DONO=1438010935783460954
 
+# ====== CONFIGURA AQUI OS 3 IDS ======
+CANAL_WL_ID = 1527669780364918925 # ID do canal #whitelist
+CARGO_STAFF_ID = 0 # ID do cargo da STAFF - TROCA ESSE
+CAT_TICKET_ID = 1526291631467397400 # ID da categoria WHITELIST
+# =====================================
+
 try:db=json.load(open('db.json'))
-except:db={"cfg":{"tc":0,"sc":0,"wc":0,"tr":DONO,"banner":BANNER,"prefix":"!"},"an":[],"raid":{"on":False,"lim":5},"wl":{},"warns":{},"cmds":{},"tickets":{},"awaiting":{}}
+except:db={"cfg":{"tc":CAT_TICKET_ID,"sc":CARGO_STAFF_ID,"wc":CANAL_WL_ID,"tr":DONO,"banner":BANNER,"prefix":"!"},"an":[],"raid":{"on":False,"lim":5},"wl":{},"warns":{},"cmds":{},"tickets":{},"awaiting":{}}
 def sv():
  with open('db.json','w') as f:json.dump(db,f)
 
@@ -29,7 +35,7 @@ PERGUNTAS=["1. Qual seu nome completo e idade?","2. Você tem microfone? Sabe us
 
 class ConfigPanel(discord.ui.View):
  def __init__(self):super().__init__(timeout=None)
- @discord.ui.select(placeholder="⚙️ SELECIONE O QUE QUER CONFIGURAR",custom_id="config_select_v120",options=[discord.SelectOption(label="Canal de Whitelist",emoji="📝",value="wc"),discord.SelectOption(label="Cargo da Staff",emoji="👮",value="sc"),discord.SelectOption(label="Categoria de Tickets",emoji="📂",value="tc"),discord.SelectOption(label="Anti-Raid ON/OFF",emoji="🚨",value="raid"),discord.SelectOption(label="Limite Anti-Raid",emoji="🔢",value="lim"),discord.SelectOption(label="Trocar Banner",emoji="🖼️",value="banner"),discord.SelectOption(label="Prefixo do Bot",emoji="#️⃣",value="prefix"),discord.SelectOption(label="Criar Comando Custom",emoji="➕",value="addcmd"),discord.SelectOption(label="Deletar Comando",emoji="➖",value="delcmd"),discord.SelectOption(label="Listar Comandos",emoji="📋",value="listcmd"),])
+ @discord.ui.select(placeholder="⚙️ SELECIONE O QUE QUER CONFIGURAR",custom_id="config_select_v121",options=[discord.SelectOption(label="Canal de Whitelist",emoji="📝",value="wc"),discord.SelectOption(label="Cargo da Staff",emoji="👮",value="sc"),discord.SelectOption(label="Categoria de Tickets",emoji="📂",value="tc"),discord.SelectOption(label="Anti-Raid ON/OFF",emoji="🚨",value="raid"),discord.SelectOption(label="Limite Anti-Raid",emoji="🔢",value="lim"),discord.SelectOption(label="Trocar Banner",emoji="🖼️",value="banner"),discord.SelectOption(label="Prefixo do Bot",emoji="#️⃣",value="prefix"),discord.SelectOption(label="Criar Comando Custom",emoji="➕",value="addcmd"),discord.SelectOption(label="Deletar Comando",emoji="➖",value="delcmd"),discord.SelectOption(label="Listar Comandos",emoji="📋",value="listcmd"),])
  async def select(self,i,s):
   if i.user.id!=DONO and str(i.user.id)!=db["cfg"]["sc"]:return await i.response.send_message("❌ Sem permissão",ephemeral=True)
   op=s.values[0];uid=str(i.user.id);db["awaiting"][uid]=op;sv()
@@ -44,28 +50,28 @@ class StaffTicket(discord.ui.View):
   ch=bot.get_channel(self.cid)
   if ch:await ch.delete()
   for k in [self.uid,f"step_{self.uid}",f"res_{self.uid}"]:db["tickets"].pop(k,None);sv()
- @discord.ui.button(label="ACEITAR",style=discord.ButtonStyle.green,emoji="✅",custom_id="accept_ticket_v120")
+ @discord.ui.button(label="ACEITAR",style=discord.ButtonStyle.green,emoji="✅",custom_id="accept_ticket_v121")
  async def accept(self,i,b):
   if not (i.user.guild_permissions.administrator or i.user.id==DONO or str(i.user.id)==db["cfg"]["sc"]):return await i.response.send_message("❌ Só STAFF",ephemeral=True)
   db["wl"][self.uid]["status"]="aprovado";sv();await (await bot.fetch_user(int(self.uid))).send("✅ **APROVADO** no Nosso RP!");await self.apagar(i)
- @discord.ui.button(label="RECUSAR",style=discord.ButtonStyle.red,emoji="❌",custom_id="deny_ticket_v120")
+ @discord.ui.button(label="RECUSAR",style=discord.ButtonStyle.red,emoji="❌",custom_id="deny_ticket_v121")
  async def deny(self,i,b):
   if not (i.user.guild_permissions.administrator or i.user.id==DONO or str(i.user.id)==db["cfg"]["sc"]):return await i.response.send_message("❌ Só STAFF",ephemeral=True)
   db["wl"][self.uid]["status"]="reprovado";sv();await (await bot.fetch_user(int(self.uid))).send("❌ **REPROVADO** no Nosso RP!");await self.apagar(i)
- @discord.ui.button(label="FECHAR",style=discord.ButtonStyle.gray,emoji="🔒",custom_id="close_ticket_v120")
+ @discord.ui.button(label="FECHAR",style=discord.ButtonStyle.gray,emoji="🔒",custom_id="close_ticket_v121")
  async def close(self,i,b):
   if not (i.user.guild_permissions.administrator or i.user.id==DONO or str(i.user.id)==db["cfg"]["sc"]):return await i.response.send_message("❌ Só STAFF",ephemeral=True)
   await self.apagar(i)
 
 class WLStartButton(discord.ui.View):
  def __init__(self):super().__init__(timeout=None)
- @discord.ui.button(label="INICIAR WHITELIST",style=discord.ButtonStyle.green,emoji="📝",custom_id="wl_ticket_v120")
+ @discord.ui.button(label="INICIAR WHITELIST",style=discord.ButtonStyle.green,emoji="📝",custom_id="wl_ticket_v121")
  async def start(self,i,b):
   uid=str(i.user.id)
   if uid in db["wl"] and db["wl"][uid]["status"]=="aprovado":return await i.response.send_message("❌ Já aprovado",ephemeral=True)
   if uid in db["tickets"]:return await i.response.send_message("❌ Ticket aberto",ephemeral=True)
   cat=bot.get_channel(db["cfg"]["tc"])
-  if not cat:return await i.response.send_message("❌ Categoria não configurada no!botconfig",ephemeral=True)
+  if not cat:return await i.response.send_message("❌ Categoria não configurada",ephemeral=True)
   overwrites={i.guild.default_role:discord.PermissionOverwrite(view_channel=False),i.user:discord.PermissionOverwrite(view_channel=True,send_messages=True),i.guild.get_role(db["cfg"]["sc"]):discord.PermissionOverwrite(view_channel=True,send_messages=True)}
   ch=await i.guild.create_text_channel(f"wl-{i.user.name}",category=cat,overwrites=overwrites)
   db["tickets"][uid]=ch.id;db["tickets"][f"step_{uid}"]=0;db["tickets"][f"res_{uid}"]={};sv()
@@ -197,6 +203,6 @@ async def setup_hook():
 @bot.event
 async def on_ready():
  va.start()
- print("✅ V120 ONLINE - SEM ERRO")
+ print("✅ V121 ONLINE - TUDO CONFIGURADO")
 
 bot.run(os.getenv("TOKEN"))
