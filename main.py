@@ -20,12 +20,11 @@ except: db = {"config":{}, "tickets":{}, "whitelist":{}, "warns":{}}
 def save(): json.dump(db, open(ARQUIVO,'w',encoding='utf-8'), ensure_ascii=False, indent=4)
 
 OWNER_ID = 1438010935783460954
-GUILD_ID = 0 # <--- 1526291625763143770
+GUILD_ID = COLA_ID_AQUI # <--- TROCA AQUI
 
 BANNER_SUPORTE = "https://cdn.discordapp.com/attachments/1481856611587723295/1549067503588606033/file_00000136881f58a07836a66e4246c.png?ex=6aa95909&is=6aa80789&hm=bdc18d543ecb36c4417854a67c81826d27438297b74e41549a177b1843797a43"
 BANNER_BOT = "https://cdn.discordapp.com/attachments/1481856611587723295/1549067503890866176/IMG_20260914_111956.jpg?ex=6aa95909&is=6aa80789&hm=e56e7317913f32b44715d63482cabc005132d429ed7e0eb7a61f7ab3c2e56181"
 
-# ============ TICKET ============
 class TicketSelect(Select):
     def __init__(self):
         options = [
@@ -72,7 +71,6 @@ class TicketMotivo(Modal):
         await canal.send(f"{i.user.mention}\n**Tipo:** {self.tipo}\n**Motivo:** {self.motivo.value}", view=TicketAcoes(i.user.id, self.tipo))
         await i.response.send_message(f"✅ Ticket: {canal.mention}", ephemeral=True)
 
-# ============ WHITELIST ============
 class WhitelistPainel(View): 
     @discord.ui.button(label="📝 Fazer Whitelist", style=discord.ButtonStyle.success)
     async def fazer(self, i, b): await i.response.send_modal(WhitelistEtapa1())
@@ -108,7 +106,6 @@ class ConfigModal(Modal, title="⚙️ Configurar Bot"):
         save()
         await i.response.send_message("✅ Configurado!", ephemeral=True)
 
-# ============ CHECK STAFF ============
 def is_staff():
     async def predicate(i: discord.Interaction):
         if any(r.id == db["config"].get("staff_cargo") for r in i.user.roles) or i.user.id == OWNER_ID:
@@ -117,7 +114,6 @@ def is_staff():
         return False
     return app_commands.check(predicate)
 
-# ============ COMANDOS ============
 @bot.tree.command(name="ticket", guild=discord.Object(id=GUILD_ID))
 async def ticket(i: discord.Interaction):
     embed = discord.Embed(title="🎫 CENTRAL DE ATENDIMENTO", color=0xFF0000)
@@ -175,17 +171,11 @@ async def config(i: discord.Interaction):
     if i.user.id!= OWNER_ID: return await i.response.send_message("❌ Só o dono", ephemeral=True)
     await i.response.send_modal(ConfigModal())
 
-@bot.tree.command(name="antiraid", guild=discord.Object(id=GUILD_ID))
-async def antiraid(i: discord.Interaction, ativo: bool):
-    if i.user.id!= OWNER_ID: return await i.response.send_message("❌ Só o dono", ephemeral=True)
-    db["config"]["antiraid"]=ativo; save()
-    await i.response.send_message(f"✅ Anti-Raid: {'ON' if ativo else 'OFF'}", ephemeral=True)
-
 @bot.event
 async def on_ready():
     guild = discord.Object(id=GUILD_ID)
-    bot.tree.copy_global_to(guild=guild)
+    bot.tree.clear_commands(guild=guild)
     await bot.tree.sync(guild=guild)
-    print(f'✅ V75 ONLINE - COMANDOS FORÇADOS NO SERVER {GUILD_ID}')
+    print(f'✅ V76 ONLINE - COMANDOS FORÇADOS NO SERVER')
 
 bot.run(os.getenv("TOKEN"))
