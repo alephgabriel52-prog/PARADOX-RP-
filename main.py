@@ -20,6 +20,7 @@ except: db = {"config":{}, "tickets":{}, "whitelist":{}, "warns":{}}
 def save(): json.dump(db, open(ARQUIVO,'w',encoding='utf-8'), ensure_ascii=False, indent=4)
 
 OWNER_ID = 1438010935783460954
+GUILD_ID = 0 # <--- 1526291625763143770
 
 BANNER_SUPORTE = "https://cdn.discordapp.com/attachments/1481856611587723295/1549067503588606033/file_00000136881f58a07836a66e4246c.png?ex=6aa95909&is=6aa80789&hm=bdc18d543ecb36c4417854a67c81826d27438297b74e41549a177b1843797a43"
 BANNER_BOT = "https://cdn.discordapp.com/attachments/1481856611587723295/1549067503890866176/IMG_20260914_111956.jpg?ex=6aa95909&is=6aa80789&hm=e56e7317913f32b44715d63482cabc005132d429ed7e0eb7a61f7ab3c2e56181"
@@ -35,10 +36,8 @@ class TicketSelect(Select):
         ]
         super().__init__(placeholder="Selecione o motivo do seu ticket", min_values=1, max_values=1, options=options)
     async def callback(self, interaction: discord.Interaction): await interaction.response.send_modal(TicketMotivo(self.values[0]))
-
 class TicketPainel(View): 
     def __init__(self): super().__init__(timeout=None); self.add_item(TicketSelect())
-
 class TicketAcoes(View):
     def __init__(self, user_id, tipo): super().__init__(timeout=None); self.user_id = user_id; self.tipo = tipo
     @discord.ui.button(label="✅ Assumir", style=discord.ButtonStyle.green)
@@ -51,7 +50,6 @@ class TicketAcoes(View):
         await i.response.send_message(f"✅ Assumido por {i.user.mention}")
     @discord.ui.button(label="🔒 Fechar", style=discord.ButtonStyle.red)
     async def fechar(self, i, b): await i.response.send_modal(FecharMotivo(self.user_id, i.channel.id, self.tipo))
-
 class FecharMotivo(Modal, title="Fechar Ticket"):
     motivo = TextInput(label="Motivo", style=discord.TextStyle.paragraph)
     def __init__(self, user_id, cid, tipo): self.user_id=user_id; self.cid=cid; self.tipo=tipo
@@ -61,7 +59,6 @@ class FecharMotivo(Modal, title="Fechar Ticket"):
         file = discord.File(io.BytesIO("\n".join(reversed(msgs)).encode()), filename=f"ticket-{self.cid}.txt")
         if db["config"].get("transcript_canal"): await bot.get_channel(db["config"]["transcript_canal"]).send(f"📁 Repositório - {self.tipo}", file=file)
         await i.response.send_message("Fechando..."); await asyncio.sleep(3); await i.channel.delete()
-
 class TicketMotivo(Modal):
     def __init__(self, tipo): super().__init__(title=f"Ticket: {tipo}"); self.tipo=tipo
     motivo = TextInput(label="Descreva", style=discord.TextStyle.paragraph)
@@ -120,8 +117,8 @@ def is_staff():
         return False
     return app_commands.check(predicate)
 
-# ============ COMANDOS PÚBLICOS ============
-@bot.tree.command(name="ticket")
+# ============ COMANDOS ============
+@bot.tree.command(name="ticket", guild=discord.Object(id=GUILD_ID))
 async def ticket(i: discord.Interaction):
     embed = discord.Embed(title="🎫 CENTRAL DE ATENDIMENTO", color=0xFF0000)
     embed.set_image(url=BANNER_SUPORTE)
@@ -129,15 +126,14 @@ async def ticket(i: discord.Interaction):
     await i.channel.send(embed=embed, view=TicketPainel())
     await i.response.send_message("✅ Enviado", ephemeral=True)
 
-@bot.tree.command(name="whitelist")
+@bot.tree.command(name="whitelist", guild=discord.Object(id=GUILD_ID))
 async def whitelist(i: discord.Interaction):
     embed = discord.Embed(title="📝 WHITELIST", color=0x57F287)
     embed.set_image(url=BANNER_BOT)
     await i.channel.send(embed=embed, view=WhitelistPainel())
     await i.response.send_message("✅ Enviado", ephemeral=True)
 
-# ============ COMANDOS STAFF/MOD ============
-@bot.tree.command(name="warn")
+@bot.tree.command(name="warn", guild=discord.Object(id=GUILD_ID))
 @is_staff()
 async def warn(i: discord.Interaction, membro: discord.Member, motivo: str):
     uid = str(membro.id)
@@ -146,50 +142,25 @@ async def warn(i: discord.Interaction, membro: discord.Member, motivo: str):
     save()
     await i.response.send_message(f"⚠️ {membro.mention} recebeu warn. Motivo: {motivo}")
 
-@bot.tree.command(name="clear")
+@bot.tree.command(name="clear", guild=discord.Object(id=GUILD_ID))
 @is_staff()
 async def clear(i: discord.Interaction, quantidade: int):
     await i.channel.purge(limit=quantidade)
     await i.response.send_message(f"✅ {quantidade} mensagens apagadas", ephemeral=True)
 
-@bot.tree.command(name="kick")
+@bot.tree.command(name="kick", guild=discord.Object(id=GUILD_ID))
 @is_staff()
 async def kick(i: discord.Interaction, membro: discord.Member, motivo: str = "Sem motivo"):
     await membro.kick(reason=motivo)
-    await i.response.send_message(f"👢 {membro.mention} foi expulso. Motivo: {motivo}")
+    await i.response.send_message(f"👢 {membro.mention} foi expulso")
 
-@bot.tree.command(name="ban")
+@bot.tree.command(name="ban", guild=discord.Object(id=GUILD_ID))
 @is_staff()
 async def ban(i: discord.Interaction, membro: discord.Member, motivo: str = "Sem motivo"):
     await membro.ban(reason=motivo)
-    await i.response.send_message(f"🔨 {membro.mention} foi banido. Motivo: {motivo}")
+    await i.response.send_message(f"🔨 {membro.mention} foi banido")
 
-@bot.tree.command(name="mute")
-@is_staff()
-async def mute(i: discord.Interaction, membro: discord.Member, tempo: int, motivo: str = "Sem motivo"):
-    await membro.timeout(discord.utils.utcnow() + discord.timedelta(minutes=tempo), reason=motivo)
-    await i.response.send_message(f"🔇 {membro.mention} mutado por {tempo} min")
-
-@bot.tree.command(name="unmute")
-@is_staff()
-async def unmute(i: discord.Interaction, membro: discord.Member):
-    await membro.timeout(None)
-    await i.response.send_message(f"🔊 {membro.mention} foi desmutado")
-
-@bot.tree.command(name="addcargo")
-@is_staff()
-async def addcargo(i: discord.Interaction, membro: discord.Member, cargo: discord.Role):
-    await membro.add_roles(cargo)
-    await i.response.send_message(f"✅ Cargo {cargo.name} adicionado")
-
-@bot.tree.command(name="removecargo")
-@is_staff()
-async def removecargo(i: discord.Interaction, membro: discord.Member, cargo: discord.Role):
-    await membro.remove_roles(cargo)
-    await i.response.send_message(f"❌ Cargo {cargo.name} removido")
-
-# ============ COMANDOS ADMIN ============
-@bot.tree.command(name="logs")
+@bot.tree.command(name="logs", guild=discord.Object(id=GUILD_ID))
 async def logs(i: discord.Interaction):
     if i.user.id!= OWNER_ID: return await i.response.send_message("❌ Só o dono", ephemeral=True)
     cat1 = await i.guild.create_category("📁 LOGS RP")
@@ -199,12 +170,12 @@ async def logs(i: discord.Interaction):
     db["config"]["logs_rp"]=ch1.id; db["config"]["logs_servidor"]=ch2.id; save()
     await i.response.send_message(f"✅ Logs criadas", ephemeral=True)
 
-@bot.tree.command(name="config")
+@bot.tree.command(name="config", guild=discord.Object(id=GUILD_ID))
 async def config(i: discord.Interaction):
     if i.user.id!= OWNER_ID: return await i.response.send_message("❌ Só o dono", ephemeral=True)
     await i.response.send_modal(ConfigModal())
 
-@bot.tree.command(name="antiraid")
+@bot.tree.command(name="antiraid", guild=discord.Object(id=GUILD_ID))
 async def antiraid(i: discord.Interaction, ativo: bool):
     if i.user.id!= OWNER_ID: return await i.response.send_message("❌ Só o dono", ephemeral=True)
     db["config"]["antiraid"]=ativo; save()
@@ -212,8 +183,9 @@ async def antiraid(i: discord.Interaction, ativo: bool):
 
 @bot.event
 async def on_ready():
-    bot.tree.clear_commands(guild=None) # CORRIGIDO - SEM AWAIT
-    await bot.tree.sync()
-    print(f'✅ V74 ONLINE - TUDO PRONTO')
+    guild = discord.Object(id=GUILD_ID)
+    bot.tree.copy_global_to(guild=guild)
+    await bot.tree.sync(guild=guild)
+    print(f'✅ V75 ONLINE - COMANDOS FORÇADOS NO SERVER {GUILD_ID}')
 
 bot.run(os.getenv("TOKEN"))
