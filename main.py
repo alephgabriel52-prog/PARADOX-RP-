@@ -3,10 +3,10 @@ from discord.ext import commands,tasks
 from flask import Flask
 from threading import Thread
 
-print("INICIANDO V114...")
+print("INICIANDO V115...")
 app=Flask('')
 @app.route('/')
-def h():return"V114 NOSSO RP"
+def h():return"V115 NOSSO RP"
 Thread(target=lambda:app.run(host='0.0.0.0',port=8080)).start()
 
 intents=discord.Intents.all()
@@ -36,7 +36,7 @@ PERGUNTAS=[
 
 class ConfigPanel(discord.ui.View):
  def __init__(self):super().__init__(timeout=None)
- @discord.ui.select(placeholder="⚙️ SELECIONE O QUE QUER CONFIGURAR",custom_id="config_select_v114",options=[
+ @discord.ui.select(placeholder="⚙️ SELECIONE O QUE QUER CONFIGURAR",custom_id="config_select_v115",options=[
   discord.SelectOption(label="Canal de Whitelist",emoji="📝",value="wc"),
   discord.SelectOption(label="Cargo da Staff",emoji="👮",value="sc"),
   discord.SelectOption(label="Categoria de Tickets",emoji="📂",value="tc"),
@@ -62,22 +62,22 @@ class StaffTicket(discord.ui.View):
   ch=bot.get_channel(self.cid)
   if ch:await ch.delete()
   for k in [self.uid,f"step_{self.uid}",f"res_{self.uid}"]:db["tickets"].pop(k,None);sv()
- @discord.ui.button(label="ACEITAR",style=discord.ButtonStyle.green,emoji="✅",custom_id="accept_ticket_v114")
+ @discord.ui.button(label="ACEITAR",style=discord.ButtonStyle.green,emoji="✅",custom_id="accept_ticket_v115")
  async def accept(self,i,b):
   if not (i.user.guild_permissions.administrator or i.user.id==DONO or str(i.user.id)==db["cfg"]["sc"]):return await i.response.send_message("❌ Só STAFF",ephemeral=True)
   db["wl"][self.uid]["status"]="aprovado";sv();await (await bot.fetch_user(int(self.uid))).send("✅ **APROVADO** no Nosso RP!");await self.apagar(i)
- @discord.ui.button(label="RECUSAR",style=discord.ButtonStyle.red,emoji="❌",custom_id="deny_ticket_v114")
+ @discord.ui.button(label="RECUSAR",style=discord.ButtonStyle.red,emoji="❌",custom_id="deny_ticket_v115")
  async def deny(self,i,b):
   if not (i.user.guild_permissions.administrator or i.user.id==DONO or str(i.user.id)==db["cfg"]["sc"]):return await i.response.send_message("❌ Só STAFF",ephemeral=True)
   db["wl"][self.uid]["status"]="reprovado";sv();await (await bot.fetch_user(int(self.uid))).send("❌ **REPROVADO** no Nosso RP!");await self.apagar(i)
- @discord.ui.button(label="FECHAR",style=discord.ButtonStyle.gray,emoji="🔒",custom_id="close_ticket_v114")
+ @discord.ui.button(label="FECHAR",style=discord.ButtonStyle.gray,emoji="🔒",custom_id="close_ticket_v115")
  async def close(self,i,b):
   if not (i.user.guild_permissions.administrator or i.user.id==DONO or str(i.user.id)==db["cfg"]["sc"]):return await i.response.send_message("❌ Só STAFF",ephemeral=True)
   await self.apagar(i)
 
 class WLStartButton(discord.ui.View):
  def __init__(self):super().__init__(timeout=None)
- @discord.ui.button(label="INICIAR WHITELIST",style=discord.ButtonStyle.green,emoji="📝",custom_id="wl_ticket_v114")
+ @discord.ui.button(label="INICIAR WHITELIST",style=discord.ButtonStyle.green,emoji="📝",custom_id="wl_ticket_v115")
  async def start(self,i,b):
   uid=str(i.user.id)
   if uid in db["wl"] and db["wl"][uid]["status"]=="aprovado":return await i.response.send_message("❌ Já aprovado",ephemeral=True)
@@ -116,7 +116,6 @@ async def va():
    if c:await c.send("@everyone",embed=discord.Embed(title="📢 ANÚNCIO NOSSO RP",description=x["m"],color=0xFF0000).set_image(url=db["cfg"]["banner"]))
    db["an"].remove(x);sv()
 
-# ========== COMANDOS ==========
 @bot.command()
 async def whitelist(ctx):
  if ctx.channel.id!=db["cfg"]["wc"]:return await ctx.send(f"❌ Use <#{db['cfg']['wc']}>")
@@ -135,14 +134,10 @@ async def botconfig(ctx):
 
 @bot.command()
 @is_staff()
-async def ban(ctx,member:discord.Member,*,motivo="Sem motivo"):
- await member.ban(reason=motivo);await ctx.send(f"🔨 {member.mention} foi **BANIDO**. Motivo: {motivo}")
-
+async def ban(ctx,member:discord.Member,*,motivo="Sem motivo"):await member.ban(reason=motivo);await ctx.send(f"🔨 {member.mention} BANIDO. Motivo: {motivo}")
 @bot.command()
 @is_staff()
-async def kick(ctx,member:discord.Member,*,motivo="Sem motivo"):
- await member.kick(reason=motivo);await ctx.send(f"👢 {member.mention} foi **EXPULSO**. Motivo: {motivo}")
-
+async def kick(ctx,member:discord.Member,*,motivo="Sem motivo"):await member.kick(reason=motivo);await ctx.send(f"👢 {member.mention} EXPULSO. Motivo: {motivo}")
 @bot.command()
 @is_staff()
 async def mute(ctx,member:discord.Member,tempo:int=10):
@@ -151,58 +146,46 @@ async def mute(ctx,member:discord.Member,tempo:int=10):
  for c in ctx.guild.channels:await c.set_permissions(role,send_messages=False)
  await member.add_roles(role);await ctx.send(f"🔇 {member.mention} mutado por {tempo}min")
  await asyncio.sleep(tempo*60);await member.remove_roles(role)
-
 @bot.command()
 @is_staff()
-async def unmute(ctx,member:discord.Member):
- role=discord.utils.get(ctx.guild.roles,name="Mutado")
+async def unmute(ctx,member:discord.Member):role=discord.utils.get(ctx.guild.roles,name="Mutado");
  if role:await member.remove_roles(role);await ctx.send(f"🔊 {member.mention} desmutado")
-
 @bot.command()
 @is_staff()
 async def warn(ctx,member:discord.Member,*,motivo):
- uid=str(member.id)
- if uid not in db["warns"]:db["warns"][uid]=[]
- db["warns"][uid].append(motivo);sv()
- await ctx.send(f"⚠️ {member.mention} recebeu um WARN. Total: {len(db['warns'][uid])}")
-
+ uid=str(member.id);db["warns"].setdefault(uid,[]);db["warns"][uid].append(motivo);sv()
+ await ctx.send(f"⚠️ {member.mention} WARN. Total: {len(db['warns'][uid])}")
 @bot.command()
 @is_staff()
 async def warns(ctx,member:discord.Member):
- uid=str(member.id)
+ uid=str(member.id);
  if uid not in db["warns"] or not db["warns"][uid]:return await ctx.send("✅ Sem warns")
- txt="\n".join([f"{i+1}. {w}" for i,w in enumerate(db['warns'][uid])])
+ txt="\n".join([f"{i+1}. {w}" for i,w in enumerate(db['warns'][uid])
  await ctx.send(f"**WARNS DE {member.name}:**\n{txt}")
-
 @bot.command()
 @is_staff()
-async def clear(ctx,amount:int=10):
- await ctx.channel.purge(limit=amount+1);await ctx.send(f"🧹 {amount} mensagens apagadas",delete_after=3)
-
+async def clear(ctx,amount:int=10):await ctx.channel.purge(limit=amount+1);await ctx.send(f"🧹 {amount} apagadas",delete_after=3)
 @bot.command()
 @is_staff()
 async def anuncio(ctx,*,msg):
  for c in ctx.guild.text_channels:
   if c.name in ["anuncio","anuncios","avisos"]:
    await c.send("@everyone",embed=discord.Embed(title="📢 ANÚNCIO NOSSO RP",description=msg,color=0xFF0000).set_image(url=db["cfg"]["banner"]))
-   return await ctx.send("✅ Anúncio enviado!")
- await ctx.send("❌ Crie um canal chamado #anuncios")
-
+   return await ctx.send("✅ Enviado!")
+ await ctx.send("❌ Crie #anuncios")
 @bot.command()
 @is_staff()
 async def addcmd(ctx,*,args):
  try:nome,resposta=args.split("|",1);db["cmds"][nome.strip()]=resposta.strip();sv();await ctx.send(f"✅ `!{nome.strip()}` criado!")
  except:await ctx.send("❌ Use: `!addcmd nome | resposta`")
-
 @bot.command()
 @is_staff()
 async def delcmd(ctx,nome):
  if nome in db["cmds"]:del db["cmds"][nome];sv();await ctx.send(f"✅ `!{nome}` deletado")
  else:await ctx.send("❌ Não existe")
-
 @bot.command()
 async def comandos(ctx):
- cmds="**COMANDOS NOSSO RP:**\n\n**GERAL:**\n`!whitelist` `!botconfig` `!comandos`\n\n**STAFF:**\n`!ban @user motivo` `!kick @user motivo` `!mute @user minutos`\n`!unmute @user` `!warn @user motivo` `!warns @user` `!clear qtd`\n`!anuncio texto` `!addcmd` `!delcmd`"
+ cmds="**COMANDOS:**\n`!whitelist` `!botconfig` `!comandos`\n`!ban` `!kick` `!mute` `!unmute` `!warn` `!warns` `!clear` `!anuncio` `!addcmd` `!delcmd`"
  if db["cmds"]:cmds+="\n\n**CUSTOM:** " + ", ".join([f"!{k}" for k in db["cmds"].keys()])
  await ctx.send(cmds)
 
@@ -210,10 +193,11 @@ async def comandos(ctx):
 async def setup_hook():
  bot.add_view(WLStartButton())
  bot.add_view(StaffTicket("0",0))
+ bot.add_view(ConfigPanel())
 
 @bot.event
 async def on_ready():
  va.start()
- print("✅ V114 ONLINE - NOSSO RP COMPLETO")
+ print("✅ V115 ONLINE - SEM ERRO")
 
 bot.run(os.getenv("TOKEN"))
