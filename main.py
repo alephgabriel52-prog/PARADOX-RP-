@@ -3,10 +3,10 @@ from discord.ext import commands,tasks
 from flask import Flask
 from threading import Thread
 
-print("INICIANDO V101...")
+print("INICIANDO V102...")
 app=Flask('')
 @app.route('/')
-def h():return"V101 PARADOXO RP"
+def h():return"V102 PARADOXO RP"
 Thread(target=lambda:app.run(host='0.0.0.0',port=8080)).start()
 
 intents=discord.Intents.all()
@@ -23,35 +23,6 @@ def is_staff():
  async def p(ctx):return ctx.author.guild_permissions.administrator or ctx.author.id==1438010935783460954
  return commands.check(p)
 
-# BOTÃO CORRIGIDO COM CUSTOM_ID
-class WLButton(discord.ui.View):
- def __init__(self):super().__init__(timeout=None)
- @discord.ui.button(label="INICIAR WHITELIST",style=discord.ButtonStyle.green,emoji="📝",custom_id="wl_start_btn")
- async def btn(self,interaction:discord.Interaction,button:discord.ui.Button):
-  uid=str(interaction.user.id)
-  if uid in db["wl"] and db["wl"][uid]["status"]=="aprovado":
-   return await interaction.response.send_message("❌ Você já foi **APROVADO**",ephemeral=True)
-  await interaction.response.send_message("📩 Te mandei as perguntas no PV!",ephemeral=True)
-  try:
-   await interaction.user.send("**WHITELIST PARADOXO RP**\n1. Qual seu nome e idade?")
-   r1=await bot.wait_for('message',check=lambda m:m.author==interaction.user and isinstance(m.channel,discord.DMChannel),timeout=300)
-   await interaction.user.send("2. Já jogou RP antes? Qual cidade?")
-   r2=await bot.wait_for('message',check=lambda m:m.author==interaction.user and isinstance(m.channel,discord.DMChannel),timeout=300)
-   await interaction.user.send("3. Por que quer entrar no Paradoxo RP?")
-   r3=await bot.wait_for('message',check=lambda m:m.author==interaction.user and isinstance(m.channel,discord.DMChannel),timeout=300)
-   
-   db["wl"][uid]={"r1":r1.content,"r2":r2.content,"r3":r3.content,"status":"pendente"};sv()
-   ch=bot.get_channel(db["cfg"]["wc"])
-   if ch:
-    e=discord.Embed(title=f"📝 NOVA WHITELIST - {interaction.user.name}",color=0xFF0000)
-    e.add_field(name="1. Nome/Idade",value=r1.content,inline=False)
-    e.add_field(name="2. Exp RP",value=r2.content,inline=False)
-    e.add_field(name="3. Motivo",value=r3.content,inline=False)
-    e.set_footer(text=f"ID: {uid}")
-    await ch.send(f"<@&{db['cfg']['sc']}>",embed=e)
-   await interaction.user.send("✅ Enviado! Aguarde a STAFF analisar.")
-  except:await interaction.user.send("❌ Tempo esgotou. Use!whitelist de novo")
-
 @tasks.loop(minutes=1)
 async def va():
  a=datetime.datetime.now().strftime("%H:%M")
@@ -61,20 +32,36 @@ async def va():
    if c:await c.send("@everyone",embed=discord.Embed(title="📢 ANÚNCIO PARADOXO RP",description=x["m"],color=0xFF0000).set_image(url=BANNER))
    db["an"].remove(x);sv()
 
+# WHITELIST SEM BOTÃO - 100% FUNCIONAL
 @bot.command()
 async def whitelist(ctx):
- embed=discord.Embed(title="📝 WHITELIST PARADOXO RP",description="✅ APROVADO = não faz mais\n🔄 REPROVADO = pode tentar de novo\nClique no botão abaixo para iniciar!",color=0xFF0000).set_image(url=BANNER)
- await ctx.send(embed=embed,view=WLButton())
+ embed=discord.Embed(title="📝 WHITELIST PARADOXO RP",description="✅ APROVADO = não faz mais\n🔄 REPROVADO = pode tentar de novo\n\n**Para começar digite:** `!fazerwl`\nEu vou te chamar no PV com as perguntas",color=0xFF0000).set_image(url=BANNER)
+ await ctx.send(embed=embed)
 
 @bot.command()
-@is_staff()
-async def setwlchannel(ctx,ch:discord.TextChannel):
- db["cfg"]["wc"]=ch.id;sv();await ctx.send(f"✅ Canal de whitelist: {ch.mention}")
-
-@bot.command()
-@is_staff()
-async def setstaffcargo(ctx,role:discord.Role):
- db["cfg"]["sc"]=role.id;sv();await ctx.send(f"✅ Cargo STAFF: {role.name}")
+async def fazerwl(ctx):
+ uid=str(ctx.author.id)
+ if uid in db["wl"] and db["wl"][uid]["status"]=="aprovado":
+  return await ctx.send("❌ Você já foi **APROVADO**")
+ try:
+  await ctx.author.send("**WHITELIST PARADOXO RP**\n1. Qual seu nome e idade?")
+  r1=await bot.wait_for('message',check=lambda m:m.author==ctx.author and isinstance(m.channel,discord.DMChannel),timeout=300)
+  await ctx.author.send("2. Já jogou RP antes? Qual cidade?")
+  r2=await bot.wait_for('message',check=lambda m:m.author==ctx.author and isinstance(m.channel,discord.DMChannel),timeout=300)
+  await ctx.author.send("3. Por que quer entrar no Paradoxo RP?")
+  r3=await bot.wait_for('message',check=lambda m:m.author==ctx.author and isinstance(m.channel,discord.DMChannel),timeout=300)
+  
+  db["wl"][uid]={"r1":r1.content,"r2":r2.content,"r3":r3.content,"status":"pendente"};sv()
+  ch=bot.get_channel(db["cfg"]["wc"])
+  if ch:
+   e=discord.Embed(title=f"📝 NOVA WHITELIST - {ctx.author.name}",color=0xFF0000)
+   e.add_field(name="1. Nome/Idade",value=r1.content,inline=False)
+   e.add_field(name="2. Exp RP",value=r2.content,inline=False)
+   e.add_field(name="3. Motivo",value=r3.content,inline=False)
+   e.set_footer(text=f"ID: {uid}")
+   await ch.send(f"<@&{db['cfg']['sc']}>",embed=e)
+  await ctx.author.send("✅ Enviado! Aguarde a STAFF analisar.")
+ except:await ctx.author.send("❌ Tempo esgotou. Use!fazerwl de novo")
 
 @bot.command()
 @is_staff()
@@ -90,10 +77,19 @@ async def reprovar(ctx,member:discord.Member,*,motivo="Sem motivo"):
  await member.send(f"❌ **REPROVADO**\nMotivo: {motivo}\nPode tentar novamente!")
  await ctx.send(f"❌ {member.mention} **REPROVADO**")
 
+@bot.command()
+@is_staff()
+async def setwlchannel(ctx,ch:discord.TextChannel):
+ db["cfg"]["wc"]=ch.id;sv();await ctx.send(f"✅ Canal de whitelist: {ch.mention}")
+
+@bot.command()
+@is_staff()
+async def setstaffcargo(ctx,role:discord.Role):
+ db["cfg"]["sc"]=role.id;sv();await ctx.send(f"✅ Cargo STAFF: {role.name}")
+
 @bot.event
 async def on_ready():
  va.start()
- bot.add_view(WLButton()) # REGISTRA O BOTÃO PRA FICAR PERSISTENTE
- print("✅ V101 ONLINE - PARADOXO RP")
+ print("✅ V102 ONLINE - PARADOXO RP")
 
 bot.run(os.getenv("TOKEN"))
