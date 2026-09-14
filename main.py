@@ -3,10 +3,10 @@ from discord.ext import commands,tasks
 from flask import Flask
 from threading import Thread
 
-print("INICIANDO V109...")
+print("INICIANDO V110...")
 app=Flask('')
 @app.route('/')
-def h():return"V109 NOSSO RP"
+def h():return"V110 NOSSO RP"
 Thread(target=lambda:app.run(host='0.0.0.0',port=8080)).start()
 
 intents=discord.Intents.all()
@@ -17,7 +17,7 @@ BANNER="https://cdn.discordapp.com/attachments/1527669780364918925/1549093554960
 DONO=1438010935783460954
 
 try:db=json.load(open('db.json'))
-except:db={"cfg":{"tc":0,"sc":0,"wc":0,"tr":DONO,"banner":BANNER,"prefix":"!"},"an":[],"raid":{"on":False,"lim":5},"wl":{},"warns":{},"cmds":{}}
+except:db={"cfg":{"tc":0,"sc":0,"wc":0,"tr":DONO,"banner":BANNER,"prefix":"!"},"an":[],"raid":{"on":False,"lim":5},"wl":{},"warns":{},"cmds":{},"pending":{}}
 def sv():
  with open('db.json','w') as f:json.dump(db,f)
 
@@ -69,58 +69,68 @@ class ConfigPanel(discord.ui.View):
   elif op=="delcmd":await interaction.response.send_message("➖ Manda o nome do comando pra deletar",ephemeral=True)
   elif op=="listcmd":lista=", ".join(db['cmds'].keys()) if db['cmds'] else "Nenhum";await interaction.response.send_message(f"📋 Comandos: {lista}",ephemeral=True)
 
+class StaffAction(discord.ui.View):
+ def __init__(self,uid):super().__init__(timeout=None);self.uid=uid
+ @discord.ui.button(label="ACEITAR",style=discord.ButtonStyle.green,emoji="✅",custom_id="accept")
+ async def accept(self,interaction:discord.Interaction,button:discord.ui.Button):
+  if not (interaction.user.guild_permissions.administrator or interaction.user.id==DONO or str(interaction.user.id)==db["cfg"]["sc"]):
+   return await interaction.response.send_message("❌ Só STAFF pode clicar",ephemeral=True)
+  db["wl"][self.uid]["status"]="aprovado";sv()
+  user=await bot.fetch_user(int(self.uid))
+  await user.send("✅ **APROVADO** na whitelist do Nosso RP!")
+  await interaction.response.edit_message(content=f"✅ **APROVADO POR {interaction.user.mention}**",embed=None,view=None)
+ @discord.ui.button(label="RECUSAR",style=discord.ButtonStyle.red,emoji="❌",custom_id="deny")
+ async def deny(self,interaction:discord.Interaction,button:discord.ui.Button):
+  if not (interaction.user.guild_permissions.administrator or interaction.user.id==DONO or str(interaction.user.id)==db["cfg"]["sc"]):
+   return await interaction.response.send_message("❌ Só STAFF pode clicar",ephemeral=True)
+  db["wl"][self.uid]["status"]="reprovado";sv()
+  user=await bot.fetch_user(int(self.uid))
+  await user.send("❌ **REPROVADO** na whitelist do Nosso RP. Pode tentar novamente!")
+  await interaction.response.edit_message(content=f"❌ **RECUSADO POR {interaction.user.mention}**",embed=None,view=None)
+
+class WLStartButton(discord.ui.View):
+ def __init__(self):super().__init__(timeout=None)
+ @discord.ui.button(label="INICIAR WHITELIST",style=discord.ButtonStyle.green,emoji="📝",custom_id="wl_start")
+ async def start(self,interaction:discord.Interaction,button:discord.ui.Button):
+  uid=str(interaction.user.id)
+  if uid in db["wl"] and db["wl"][uid]["status"]=="aprovado":
+   return await interaction.response.send_message("❌ Você já foi **APROVADO**",ephemeral=True)
+  if uid in db["pending"]:
+   return await interaction.response.send_message("❌ Você já tem uma whitelist em andamento",ephemeral=True)
+
+  db["pending"][uid]={"step":0,"respostas":{}};sv()
+  await interaction.response.send_message(f"{interaction.user.mention} **WHITELIST NOSSO RP INICIADA**\nResponda as 15 perguntas abaixo neste canal:",ephemeral=False)
+  await interaction.channel.send(PERGUNTAS[0])
+
 @bot.event
 async def on_message(message):
  if message.author.bot:return
+ uid=str(message.author.id)
+
+ # Sistema de perguntas no canal
+ if uid in db["pending"]:
+  p=db["pending"][uid]
+  p["respostas"][f"p{p['step']+1}"]=message.content
+  p["step"]+=1
+
+  if p["step"]<len(PERGUNTAS):
+   await message.channel.send(PERGUNTAS[p["step"]])
+  else:
+   # Finalizou todas
+   db["wl"][uid]=p["respostas"];db["wl"][uid]["status"]="pendente";del db["pending"][uid];sv()
+   ch=bot.get_channel(db["cfg"]["wc"])
+   e=discord.Embed(title=f"📝 WHITELIST PENDENTE - {message.author.name}",color=0xFF0000)
+   for i,perg in enumerate(PERGUNTAS):
+    e.add_field(name=perg[:50],value=p["respostas"][f"p{i+1}"][:100],inline=False)
+   await ch.send(f"<@&{db['cfg']['sc']}>",embed=e,view=StaffAction(uid))
+   await message.channel.send("✅ Enviado para STAFF! Aguarde a análise.")
+
+ # Comandos custom
  if message.content.startswith(db["cfg"]["prefix"]):
   cmd=message.content[len(db["cfg"]["prefix"]):].split()[0]
   if cmd in db["cmds"]:
    await message.channel.send(db["cmds"][cmd])
  await bot.process_commands(message)
-
-class StaffPanel(discord.ui.View):
- def __init__(self,uid):super().__init__(timeout=None);self.uid=uid
- @discord.ui.button(label="APROVAR",style=discord.ButtonStyle.green,emoji="✅",custom_id="wl_aprovar")
- async def aprovar(self,interaction:discord.Interaction,button:discord.ui.Button):
-  if not (interaction.user.guild_permissions.administrator or interaction.user.id==DONO or str(interaction.user.id)==db["cfg"]["sc"]):
-   return await interaction.response.send_message("❌ Sem permissão",ephemeral=True)
-  db["wl"][self.uid]["status"]="aprovado";sv()
-  user=await bot.fetch_user(int(self.uid))
-  await user.send("✅ **APROVADO** na whitelist do Nosso RP!")
-  await interaction.response.edit_message(content="✅ **APROVADO PELA STAFF**",embed=None,view=None)
- @discord.ui.button(label="REPROVAR",style=discord.ButtonStyle.red,emoji="❌",custom_id="wl_reprovar")
- async def reprovar(self,interaction:discord.Interaction,button:discord.ui.Button):
-  if not (interaction.user.guild_permissions.administrator or interaction.user.id==DONO or str(interaction.user.id)==db["cfg"]["sc"]):
-   return await interaction.response.send_message("❌ Sem permissão",ephemeral=True)
-  db["wl"][self.uid]["status"]="reprovado";sv()
-  user=await bot.fetch_user(int(self.uid))
-  await user.send("❌ **REPROVADO** na whitelist do Nosso RP. Pode tentar novamente!")
-  await interaction.response.edit_message(content="❌ **REPROVADO PELA STAFF**",embed=None,view=None)
-
-class WLButton(discord.ui.View):
- def __init__(self):super().__init__(timeout=None)
- @discord.ui.button(label="INICIAR WHITELIST",style=discord.ButtonStyle.green,emoji="📝",custom_id="wl_start_btn")
- async def btn(self,interaction:discord.Interaction,button:discord.ui.Button):
-  uid=str(interaction.user.id)
-  if uid in db["wl"] and db["wl"][uid]["status"]=="aprovado":
-   return await interaction.response.send_message("❌ Você já foi **APROVADO**",ephemeral=True)
-  await interaction.response.send_message("📩 Te mandei as 15 perguntas no PV! Responde com calma.",ephemeral=True)
-  try:
-   respostas={}
-   for i,perg in enumerate(PERGUNTAS):
-    await interaction.user.send(f"**WHITELIST NOSSO RP**\n{perg}")
-    r=await bot.wait_for('message',check=lambda m:m.author==interaction.user and isinstance(m.channel,discord.DMChannel),timeout=600)
-    respostas[f"p{i+1}"]=r.content
-
-   db["wl"][uid]=respostas;db["wl"][uid]["status"]="pendente";sv()
-   ch=bot.get_channel(db["cfg"]["wc"])
-   if ch:
-    e=discord.Embed(title=f"📝 NOVA WHITELIST - {interaction.user.name}",color=0xFF0000)
-    for i,perg in enumerate(PERGUNTAS):
-     e.add_field(name=perg[:50],value=respostas[f"p{i+1}"][:100],inline=False)
-    await ch.send(f"<@&{db['cfg']['sc']}>",embed=e,view=StaffPanel(uid))
-   await interaction.user.send("✅ Enviado! Aguarde a STAFF analisar.")
-  except:await interaction.user.send("❌ Tempo esgotou. Use!whitelist de novo")
 
 @tasks.loop(minutes=1)
 async def va():
@@ -133,8 +143,9 @@ async def va():
 
 @bot.command()
 async def whitelist(ctx):
+ if ctx.channel.id!=db["cfg"]["wc"]:return await ctx.send(f"❌ Use no canal de whitelist <#{db['cfg']['wc']}>")
  embed=discord.Embed(title="📝 WHITELIST NOSSO RP",description="✅ APROVADO = não faz mais\n🔄 REPROVADO = pode tentar de novo\nSão 15 perguntas. Clique no botão abaixo!",color=0xFF0000).set_image(url=db["cfg"]["banner"])
- await ctx.send(embed=embed,view=WLButton())
+ await ctx.send(embed=embed,view=WLStartButton())
 
 @bot.command()
 async def botconfig(ctx):
@@ -156,20 +167,14 @@ async def addcmd(ctx,*,args):
   await ctx.send(f"✅ Comando `!{nome.strip()}` criado!")
  except:await ctx.send("❌ Use: `!addcmd nome | resposta`")
 
-@bot.command()
-@is_staff()
-async def delcmd(ctx,nome):
- if nome in db["cmds"]:del db["cmds"][nome];sv();await ctx.send(f"✅ Comando `!{nome}` deletado")
- else:await ctx.send("❌ Comando não existe")
-
 @bot.event
 async def setup_hook():
- bot.add_view(WLButton())
- bot.add_view(StaffPanel("0"))
+ bot.add_view(WLStartButton())
+ bot.add_view(StaffAction("0"))
 
 @bot.event
 async def on_ready():
  va.start()
- print("✅ V109 ONLINE - NOSSO RP")
+ print("✅ V110 ONLINE - NOSSO RP")
 
 bot.run(os.getenv("TOKEN"))
